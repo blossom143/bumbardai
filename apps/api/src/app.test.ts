@@ -1,3 +1,4 @@
+import { questTreeSchema } from '@hallway/shared/responses';
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
@@ -96,6 +97,46 @@ async function startQuest(cookie: string) {
   assert.equal(started.statusCode, 200, started.body);
   return id;
 }
+
+test(
+  'quest tree unlocks branch nodes and awards XP once after skip and restart',
+  setup,
+  async () => {
+    const user = await attendee();
+    const other = await attendee();
+    const read = async (cookie = user.cookie) =>
+      questTreeSchema.parse((await request('/api/quests/tree', 'GET', undefined, cookie)).json());
+    const start = (key: string) =>
+      request('/api/quests/tree/' + encodeURIComponent(key) + '/start', 'POST', {}, user.cookie);
+    const action = (id: string, action: string) =>
+      request('/api/quests/' + id + '/action', 'POST', { action }, user.cookie);
+
+    assert.equal((await request('/api/quests/tree')).statusCode, 401);
+    const tree = await read();
+    assert.deepEqual(
+      tree.map(({ nodes }) => nodes.map(({ state }) => state)),
+      Array.from({ length: 4 }, () => ['available', 'locked', 'locked', 'locked', 'locked']),
+    );
+    const [first, next] = tree[0]!.nodes;
+    assert.equal((await start(next!.key)).statusCode, 409);
+    const started = await start(first!.key);
+    assert.equal(started.statusCode, 200, started.body);
+    const { id } = started.json();
+    assert.equal((await start(tree[1]!.nodes[0]!.key)).statusCode, 409);
+    assert.equal((await action(id, 'skip')).statusCode, 200);
+    assert.equal((await read())[0]?.nodes[0]?.state, 'available');
+    assert.equal((await action(id, 'start')).statusCode, 409);
+    assert.equal((await start(first!.key)).json().id, id);
+    const awards = await Promise.all([action(id, 'complete'), action(id, 'complete')]);
+    assert.deepEqual(awards.map((response) => response.json().awarded).sort(), [0, 50]);
+    assert.deepEqual(
+      (await read())[0]?.nodes.slice(0, 2).map(({ state }) => state),
+      ['completed', 'available'],
+    );
+    assert.equal((await read(other.cookie))[0]?.nodes[0]?.state, 'available');
+    assert.equal((await start(first!.key)).statusCode, 409);
+  },
+);
 
 test(
   'accounts are isolated, writes guard origins, and schedule overlaps require confirmation',

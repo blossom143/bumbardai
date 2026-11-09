@@ -56,6 +56,7 @@ export const catalogResultsSchema = z.object({
 export const questSchema = z.object({
   id,
   title: z.string(),
+  templateKey: z.string().nullable().optional(),
   mission: z.string(),
   icebreaker: z.string(),
   category: z.string(),
@@ -79,6 +80,24 @@ export const progressSchema = z.object({
   badges: z.string().array(),
   completed: count,
 });
+export const questTreeSchema = z.array(
+  z.object({
+    key: z.string(),
+    title: z.string(),
+    nodes: z.array(
+      z.object({
+        key: z.string(),
+        title: z.string(),
+        mission: z.string(),
+        icebreaker: z.string(),
+        difficulty,
+        minutes: z.number().int().positive(),
+        state: z.enum(['locked', 'available', 'active', 'completed']),
+        quest: questSchema.nullable(),
+      }),
+    ),
+  }),
+);
 export const awardSchema = z.object({
   awarded: count,
   badges: z.string().array(),
