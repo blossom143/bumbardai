@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Camera, Compass, MessageCircle, QrCode, Sparkles, Timer, Trophy, Zap } from 'lucide-react';
-import QRCode from 'qrcode';
 import { Link } from 'react-router-dom';
-import { api, saveSnapshot, useAction, type Award, type Quest, type User } from './api';
+import { api, useAction, type Award, type Quest } from './api';
 import { Button, Empty, ErrorText, Heading, Loading, points, Sheet } from './ui';
 
 function Scanner({ onScan }: { onScan: (code: string) => void }) {
@@ -41,7 +40,9 @@ export function QuestCard({ quest, onAward }: { quest: Quest; onAward: (result: 
   useEffect(() => {
     if (!showQr || !qr.data) return;
     let live = true;
-    void QRCode.toDataURL('hallway-quest:' + qr.data.code, { width: 224, margin: 2 }).then(value => { if (live) setQrImage(value); }).catch(() => {});
+    const code = qr.data.code;
+    void import('qrcode').then(({ default: QRCode }) => QRCode.toDataURL('hallway-quest:' + code, { width: 224, margin: 2 }))
+      .then(value => { if (live) setQrImage(value); }).catch(() => {});
     return () => { live = false; };
   }, [qr.data, showQr]);
   const active = quest.status === 'active';
@@ -66,7 +67,7 @@ export function QuestCard({ quest, onAward }: { quest: Quest; onAward: (result: 
     </Sheet>
   </article>;
 }
-export function Quests({ user }: { user: User }) {
+export function Quests() {
   const query = useQuery({ queryKey: ['quests'], queryFn: () => api<Quest[]>('/quests'), refetchInterval: 15000 });
   const create = useAction<Quest, void>(() => api('/quests/generate', 'POST', {}), ['quests', 'today']);
   const verify = useAction<{ verified: boolean }, string>(code => api('/quests/verify', 'POST', { code }), ['quests', 'today', 'progress']);
@@ -74,7 +75,6 @@ export function Quests({ user }: { user: User }) {
   const [verifying, setVerifying] = useState(false);
   const [scan, setScan] = useState(false);
   const [code, setCode] = useState('');
-  useEffect(() => { if (query.data) saveSnapshot(user, { quests: query.data.filter(item => ['active', 'suggested'].includes(item.status)) }); }, [query.data, user]);
   const available = query.data?.find(quest => quest.status === 'active' || quest.status === 'suggested');
   const history = query.data?.filter(quest => quest.status === 'completed' || quest.status === 'skipped');
   return <>

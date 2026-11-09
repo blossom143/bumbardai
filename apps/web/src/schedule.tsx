@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Temporal } from '@js-temporal/polyfill';
 import { CalendarDays, ChevronLeft, ChevronRight, Download, Plus, Upload } from 'lucide-react';
 import { category, conferenceZone, eventInput, type EventInput } from '@hallway/shared';
-import { api, saveSnapshot, useAction, type Event, type SaveResult, type User } from './api';
+import { api, useAction, type Event, type SaveResult, type User } from './api';
 import { Button, dayLabel, Empty, ErrorText, Heading, Loading, Sheet } from './ui';
 import { Checklist, EventRow } from './today';
 
@@ -90,7 +90,6 @@ export function Schedule({ user }: { user: User }) {
   const [edit, setEdit] = useState<'new' | Event | null>(null);
   const [importing, setImporting] = useState(false);
   const query = useQuery({ queryKey: ['events'], queryFn: () => api<Event[]>('/events') });
-  useEffect(() => { if (query.data) saveSnapshot(user, { events: query.data }); }, [query.data, user]);
   const dates = Array.from({ length: week ? 7 : 1 }, (_, index) => addDays(day, index));
   const selected = typeof edit === 'object' && edit ? query.data?.find(item => item.id === edit.id) ?? edit : null;
   return <>

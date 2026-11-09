@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
@@ -7,12 +7,13 @@ import { ArrowRight, Bell, CalendarDays, Compass, Home, Menu, Moon, Sparkles, Su
 import { api, ApiError, clearSnapshot, readSnapshot, saveSnapshot, useAction, useUI, type Advice, type Event, type Quest, type User } from './api';
 import { Auth, ProfileForm } from './onboarding';
 import { EventRow, Today } from './today';
-import { Explore } from './explore';
-import { Schedule } from './schedule';
-import { Quests } from './quests';
-import { Profile } from './profile';
 import { Brand, Button, Empty, ErrorText, Heading, Loading, Sheet } from './ui';
 import './styles.css';
+
+const Explore = lazy(() => import('./explore').then(module => ({ default: module.Explore })));
+const Schedule = lazy(() => import('./schedule').then(module => ({ default: module.Schedule })));
+const Quests = lazy(() => import('./quests').then(module => ({ default: module.Quests })));
+const Profile = lazy(() => import('./profile').then(module => ({ default: module.Profile })));
 
 const client = new QueryClient({ defaultOptions: { queries: {
   retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 1, staleTime: 15000,
@@ -28,12 +29,15 @@ type Reminder = { id: string; message: string };
 function Assistant({ open, close, initial }: { open: boolean; close: () => void; initial: string }) {
   const [question, setQuestion] = useState(initial);
   const action = useAction<Advice, string>(question => api('/assistant', 'POST', { question }), ['quests', 'today']);
-  useEffect(() => { if (initial) action.mutate(initial); }, []);
+  const asked = useRef(false);
+  useEffect(() => {
+    if (initial && !asked.current) { asked.current = true; action.mutate(initial); }
+  }, [initial, action.mutate]);
   return <Sheet open={open} onOpenChange={value => { if (!value) close(); }} title="Your AI field guide">
     <p className="muted">Ask for a next step based on your schedule, interests, and available time.</p>
     {action.isPending && <Loading/>}<ErrorText error={action.error}/>
     {action.data && <div className="advice"><div className="eyebrow"><Sparkles size={15}/> {action.data.mode === 'ai' ? 'AI guidance' : 'Rules-based guidance'}</div>
-      <p>{action.data.lead}</p><h3>{action.data.action.title}</h3><p>{action.data.action.detail}</p>
+      {action.data.lead && <p>{action.data.lead}</p>}<h3>{action.data.action.title}</h3><p>{action.data.action.detail}</p>
       {action.data.tips.map(tip => <p className="muted" key={tip}>{tip}</p>)}
       <Link to={action.data.action.path} onClick={close} className="text-link">Open {action.data.action.kind === 'break' ? 'Explore' : action.data.action.kind} <ArrowRight size={16}/></Link>
     </div>}
@@ -55,17 +59,24 @@ function Offline() {
 function Shell({ user, onUser }: { user: User; onUser: (user: User | null) => void }) {
   const navigate = useNavigate();
   const ui = useUI();
+  const queryClient = useQueryClient();
   const [assistant, setAssistant] = useState<string | null>(null);
   const [notifications, setNotifications] = useState(false);
   const reminders = useQuery({ queryKey: ['reminders'], queryFn: () => api<Reminder[]>('/reminders'), refetchInterval: 30000 });
   const dismiss = useAction<void, string>(id => api('/reminders/' + id, 'DELETE'), ['reminders']);
-  const logout = useAction<void, void>(() => api('/auth/logout', 'POST'));
+  const logout = useAction<void, void>(async () => {
+    await api('/auth/logout', 'POST');
+    if ('serviceWorker' in navigator) void navigator.serviceWorker.getRegistration()
+      .then(registration => registration?.pushManager?.getSubscription())
+      .then(subscription => subscription?.unsubscribe()).catch(() => {});
+  });
   const saved = useQuery({ queryKey: ['events'], queryFn: () => api<Event[]>('/events') });
   const quests = useQuery({ queryKey: ['quests'], queryFn: () => api<Quest[]>('/quests') });
   useEffect(() => {
+    if (queryClient.getQueryData<User>(['me'])?.id !== user.id) return;
     saveSnapshot(user, { ...(saved.data ? { events: saved.data } : {}),
       ...(quests.data ? { quests: quests.data.filter(quest => ['active', 'suggested'].includes(quest.status)) } : {}) });
-  }, [user, saved.data, quests.data]);
+  }, [queryClient, user, saved.data, quests.data]);
   const links = nav.map(({ path, name, icon: Icon }) => <NavLink key={path} to={path} end={path === '/'} title={name}>
     <Icon size={20}/><span>{name}</span></NavLink>);
   return <div className={'layout ' + (ui.collapsed ? 'collapsed' : '')}>
@@ -86,16 +97,16 @@ function Shell({ user, onUser }: { user: User; onUser: (user: User | null) => vo
       </header>
       <main id="main-content" className="page">
         <ErrorText error={logout.error}/>
-        <Routes>
+        <Suspense fallback={<Loading/>}><Routes>
           <Route path="/" element={<Today user={user} ask={() => setAssistant(defaultQuestion)}/>}/>
           <Route path="/explore" element={<Explore user={user}/>}/>
-          <Route path="/quests" element={<Quests user={user}/>}/>
+          <Route path="/quests" element={<Quests/>}/>
           <Route path="/schedule" element={<Schedule user={user}/>}/>
           <Route path="/profile" element={<Profile user={user} onUser={onUser} logout={() => logout.mutate(undefined, { onSuccess: () => {
             onUser(null); navigate('/');
           } })}/>}/>
           <Route path="*" element={<Navigate to="/" replace/>}/>
-        </Routes>
+        </Routes></Suspense>
         <footer>Hallway Quest <span>·</span> Make the hallway yours.</footer>
       </main>
     </div>
@@ -115,17 +126,25 @@ function App() {
   const dark = useUI(state => state.dark);
   const [online, setOnline] = useState(navigator.onLine);
   const me = useQuery({ queryKey: ['me'], queryFn: async () => {
-    try { return await api<User>('/me'); }
+    try {
+      const user = await api<User>('/me');
+      const previous = queryClient.getQueryData<User | null>(['me']);
+      if (previous && previous.id !== user.id) {
+        clearSnapshot();
+        queryClient.removeQueries({ predicate: query => query.queryKey[0] !== 'me' });
+      }
+      return user;
+    }
     catch (error) { if (error instanceof ApiError && error.status === 401) { clearSnapshot(); return null; } throw error; }
   }, enabled: online });
   const setUser = (user: User | null) => {
-    const current = me.data;
+    const current = queryClient.getQueryData<User | null>(['me']);
+    queryClient.setQueryData(['me'], user);
     if (current?.id !== user?.id) {
       clearSnapshot();
       queryClient.removeQueries({ predicate: query => query.queryKey[0] !== 'me' });
     }
     if (user) saveSnapshot(user);
-    queryClient.setQueryData(['me'], user);
   };
   useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; }, [dark]);
   useEffect(() => {
@@ -135,9 +154,7 @@ function App() {
     window.addEventListener('storage', storage);
     return () => { window.removeEventListener('online', sync); window.removeEventListener('offline', sync); window.removeEventListener('storage', storage); };
   }, [queryClient]);
-  useEffect(() => {
-    if (me.data && readSnapshot()?.owner !== me.data.id) saveSnapshot(me.data);
-  }, [me.data]);
+  useLayoutEffect(() => { if (me.data === null) clearSnapshot(); }, [me.data]);
   if (!online) return <><div className="offline-strip"><WifiOff size={16}/> Offline mode</div><Offline/></>;
   if (me.isPending) return <Loading/>;
   if (me.isError) return <main className="offline-page"><Brand/><ErrorText error={me.error}/><Button onClick={() => void me.refetch()}>Try again</Button>{readSnapshot() && <Offline/>}</main>;
