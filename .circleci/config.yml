@@ -154,12 +154,13 @@ jobs:
               git add deploy/kubernetes/image/kustomization.yaml
               git commit -m "ci: promote release ${CIRCLE_SHA1:0:7} (${NEW_DIGEST}) [skip ci]"
 
-              # If GITHUB_TOKEN is configured in environment, use it for authenticated HTTPS push
-              if [ -n "$GITHUB_TOKEN" ]; then
-                git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git"
-              fi
-
-              git push origin main
+              if [ -z "$GITHUB_TOKEN" ]; then echo "GITHUB_TOKEN not set"; exit 1; fi
+              git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git"
+              for i in 1 2 3; do
+                git fetch origin main && git rebase origin/main && git push origin HEAD:main && break
+                [ "$i" -lt 3 ] || { echo "Failed to push promoted image digest to origin/main after 3 attempts." >&2; exit 1; }
+                sleep 5
+              done
               echo "Successfully pushed promoted image digest to origin/main."
             else
               echo "deploy/kubernetes/image/kustomization.yaml is already up to date."
