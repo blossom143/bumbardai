@@ -47,9 +47,9 @@ test('phone onboarding to XP, offline schedule, and the same account on desktop'
     await expect(page.getByText('Pack your laptop')).toBeVisible();
     await expect(page.getByText('Pack your charger')).toBeVisible();
     await page.getByRole('button', { name: 'What should I do next?' }).click();
-    const assistant = page.getByRole('dialog', { name: 'Your AI field guide' });
-    await expect(assistant.getByRole('heading', { name: 'Make the first hello' })).toBeVisible();
-    await assistant.getByRole('link', { name: 'Open quest' }).click();
+    const assistant = page.getByRole('dialog', { name: 'Chat with Scout' });
+    await expect(assistant.getByText('Make the first hello', { exact: false })).toBeVisible();
+    await assistant.getByRole('link', { name: 'Explore this' }).click();
     await page.getByRole('button', { name: 'Start quest' }).click();
     const map = page.getByRole('list', { name: 'Completed quests and upcoming milestones' });
     await expect(map.getByText('First quest', { exact: true })).toBeVisible();

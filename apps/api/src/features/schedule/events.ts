@@ -139,6 +139,10 @@ async function saveEvent(
   });
 }
 
+export function createEvent(userId: string, input: EventInput) {
+  return saveEvent(userId, input, false);
+}
+
 export function eventRoutes(app: FastifyInstance) {
   app.get('/api/events', async (request) => {
     const user = await requireUser(request);
