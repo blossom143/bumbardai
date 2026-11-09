@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  demo          Boolean   @default(false)
+  profile       Json?
+  createdAt     DateTime  @default(now())
+  sessions      LoginSession[]
+  events        Event[]
+  quests        Quest[]
+  badges        Badge[]
+  xpAwards      XpAward[]
+  tokens        McpToken[]
+  reminders     Reminder[]
+  reminderPrefs Json?
+  subscriptions PushSubscription[]
+  sent          Introduction[] @relation("sender")
+  received      Introduction[] @relation("recipient")
+}
+
+model LoginSession {
+  digest    String   @id
+  userId    String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([expiresAt])
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  userId      String
+  sourceKey   String?
+  catalogId   String?
+  title       String
+  category    String
+  location    String
+  description String
+  zone        String
+  startsAt    DateTime?
+  endsAt      DateTime?
+  day         String?
+  endDay      String?
+  completedAt DateTime?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checklist   ChecklistItem[]
+  @@unique([userId, sourceKey])
+  @@index([userId, startsAt])
+}
+
+model ChecklistItem {
+  id        String  @id @default(uuid())
+  eventId   String
+  label     String
+  status    String  @default("open")
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model CatalogItem {
+  id          String   @id
+  demo        Boolean  @default(false)
+  title       String
+  category    String
+  location    String
+  description String
+  speakers    String[]
+  topics      String[]
+  skill       String?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  day         String
+  sourceUrl   String
+  importedAt  DateTime @default(now())
+  active      Boolean  @default(true)
+  @@index([demo, day])
+}
+
+model Quest {
+  id         String   @id @default(uuid())
+  userId     String
+  title      String
+  mission    String
+  icebreaker String
+  category   String
+  difficulty String
+  minutes    Int
+  status     String   @default("suggested")
+  mode       String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  award      XpAward?
+  qrCodes    QuestCode[]
+  @@index([userId, status])
+}
+
+model XpAward {
+  questId String @id
+  userId  String
+  points  Int
+  quest   Quest @relation(fields: [questId], references: [id], onDelete: Cascade)
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model Badge {
+  userId String
+  name   String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([userId, name])
+}
+
+model QuestCode {
+  digest    String   @id
+  questId   String
+  expiresAt DateTime
+  usedAt    DateTime?
+  quest     Quest    @relation(fields: [questId], references: [id], onDelete: Cascade)
+  @@index([questId])
+}
+
+model Introduction {
+  id          String @id @default(uuid())
+  pairKey     String @unique
+  senderId    String
+  recipientId String
+  status      String @default("pending")
+  sender      User   @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User   @relation("recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+}
+
+model McpToken {
+  id        String   @id @default(uuid())
+  digest    String   @unique
+  userId    String
+  label     String
+  canWrite  Boolean
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Forecast {
+  venue     String   @id
+  updatedAt DateTime
+  payload   Json
+}
+
+model Reminder {
+  id          String    @id @default(uuid())
+  key         String    @unique
+  userId      String
+  message     String
+  createdAt   DateTime  @default(now())
+  dismissedAt DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, dismissedAt])
+}
+
+model PushSubscription {
+  endpoint String @id
+  userId   String
+  p256dh   String
+  auth     String
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
