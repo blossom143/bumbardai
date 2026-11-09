@@ -1,0 +1,12 @@
+{
+  "name": "hallway-quest",
+  "private": true,
+  "packageManager": "pnpm@10.28.2",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @hallway/api test",
+    "dev": "pnpm --parallel --filter @hallway/api --filter @hallway/web dev"
+  }
+}
