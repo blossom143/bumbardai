@@ -4,14 +4,16 @@ This is a single-instance demo deployment for Kubernetes 1.32 or newer. It requi
 
 ## 1. Publish the application image
 
-Build from the repository root and push to a registry your cluster can pull from. Use a unique release tag and set the platform to match the cluster nodes.
+The manifests pin the digest published as `tuguldurdev/bumbardai:git-f35a860` for Linux AMD64 and ARM64.
+
+Publish future releases from the repository root to Docker Hub. Use a unique release tag and include the platforms your cluster runs.
 
 ```sh
-docker buildx build --platform linux/amd64 \
-  --tag ghcr.io/YOUR-ACCOUNT/hallway-quest:v0.1.0 --push .
+docker buildx build --platform linux/amd64,linux/arm64 \
+  --tag tuguldurdev/bumbardai:tagname --push .
 ```
 
-Replace the example name and tag in [the shared image component](kubernetes/image/kustomization.yaml). All four containers use that reference. To pin a digest, replace `newTag` with `digest: sha256:...`. For a private image, provision a pull secret in `hallway-quest` and add it to the service account or pod templates used by the four containers.
+Update the digest in [the shared image component](kubernetes/image/kustomization.yaml) when promoting a release. The web app, reminder worker, migration Job, and catalog Job use that single image reference. For a private image, provision a pull secret in `hallway-quest` and add it to the service account or pod templates used by the four containers.
 
 Set the repository and branch in [the Flux source](flux/source.yaml), then commit and push the manifests and image reference to that branch. The example points to the upstream `main` branch after the deployment files have merged.
 
