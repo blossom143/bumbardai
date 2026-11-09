@@ -11,7 +11,7 @@ import { motion } from 'framer-motion';
 import { Camera, Compass, MessageCircle, QrCode, Sparkles, Timer, Trophy, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api, useAction, useResource, type Award, type Quest } from '../../shared/api';
-import { QuestProgressMap } from './quest-progress-map';
+import { QuestTree } from './quest-tree';
 import {
   Input,
   Card,
@@ -204,10 +204,10 @@ export function Quests() {
   const [scan, setScan] = useState(false);
   const [code, setCode] = useState('');
   const available = query.data?.find(
-    (quest) => quest.status === 'active' || quest.status === 'suggested',
+    (quest) => !quest.templateKey && (quest.status === 'active' || quest.status === 'suggested'),
   );
   const history = query.data?.filter(
-    (quest) => quest.status === 'completed' || quest.status === 'skipped',
+    (quest) => !quest.templateKey && (quest.status === 'completed' || quest.status === 'skipped'),
   );
   return (
     <>
@@ -229,7 +229,18 @@ export function Quests() {
           </Button>
         }
       />
-      <QuestProgressMap quests={query.data ?? []} />
+      <QuestTree
+        renderActive={(quest, close) => (
+          <QuestCard
+            key={quest.id}
+            quest={quest}
+            onAward={(result) => {
+              close();
+              setAward(result);
+            }}
+          />
+        )}
+      />
       {query.loading && <Loading />}
       <ErrorText error={query.error || create.error} />
       {available ? (
