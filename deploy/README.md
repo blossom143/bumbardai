@@ -57,6 +57,8 @@ kubectl -n hallway-quest get pods,jobs,pvc
 
 Flux waits for storage, then runs the Prisma migration Job. After it completes, Flux can start the web app and reminder worker and run the official catalog import Job. The catalog sync has its own status so a conference feed outage does not block the app rollout. On a new image reference, Flux recreates the Jobs when their pod templates change. To retry a failed Job with the same image, delete that Job and reconcile its Flux Kustomization.
 
+On a fresh GKE deployment with insufficient SSD quota, set the `hallway-storage` Kustomization path to `./deploy/kubernetes/storage-gke` before applying the bundle. The overlay uses standard persistent disks through the GKE CSI driver. Existing bound claims require a storage migration before changing classes.
+
 Open the app over a local port forward:
 
 ```sh
