@@ -27,6 +27,7 @@ export const profileInput = z.object({
   firstTime: z.boolean(),
   comfort: z.enum(['quiet', 'warming-up', 'outgoing']),
   difficulty,
+  showOnQuestLeaderboard: z.boolean().default(false),
   discoverable: z.boolean().default(false),
   shareBackground: z.boolean().default(false),
 });

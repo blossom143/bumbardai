@@ -8,6 +8,7 @@ import { newIcebreaker, newQuestCopy } from '../assistant/assistant.js';
 import { clock, freeUntil, localDay } from '../schedule/calendar.js';
 import { agenda } from '../schedule/events.js';
 import { db } from '../../shared/db.js';
+import { questLeaderboard } from './leaderboard.js';
 
 const rewards = { easy: 50, medium: 75, hard: 100 };
 const categories = [
@@ -194,6 +195,9 @@ export async function icebreaker(user: User, questId?: string, topic?: string) {
 
 export function questRoutes(app: FastifyInstance) {
   app.get('/api/quests', async (request) => allQuests((await requireUser(request)).id));
+  app.get('/api/quests/leaderboard', async (request) =>
+    questLeaderboard(await requireUser(request)),
+  );
   app.get('/api/progress', async (request) => progress((await requireUser(request)).id));
   app.post('/api/quests/generate', async (request) => generateQuest(await requireUser(request)));
   app.post('/api/quests/:id/action', async (request) => {

@@ -64,6 +64,15 @@ export const questSchema = z.object({
   status: z.enum(['suggested', 'active', 'completed', 'skipped']),
   mode,
 });
+const leaderboardPlacementSchema = z.object({
+  rank: z.number().int().positive(),
+  nickname: z.string().min(1).max(60),
+  xp: z.number().int().positive(),
+});
+export const questLeaderboardSchema = z.object({
+  leaders: leaderboardPlacementSchema.extend({ isViewer: z.boolean() }).array().max(10),
+  viewer: leaderboardPlacementSchema.nullable(),
+});
 export const progressSchema = z.object({
   xp: count,
   level: count,

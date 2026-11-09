@@ -1,6 +1,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { questLeaderboardSchema } from '@hallway/shared/responses';
 import type { FastifyInstance, InjectOptions } from 'fastify';
 import { createApp } from './app.js';
 import { digest } from './features/auth/auth.js';
@@ -38,12 +39,12 @@ async function request(
     remoteAddress: '127.1.0.' + ip,
   });
 }
-async function attendee(discoverable = false) {
+async function attendee(discoverable = false, demo = true) {
   ip++;
   const created = await request('/api/auth/register', 'POST', {
     email: randomUUID() + '@example.test',
     password: 'safe-test-password',
-    demo: true,
+    demo,
   });
   assert.equal(created.statusCode, 201, created.body);
   const id = created.json().id as string;
@@ -364,5 +365,98 @@ test(
       ).statusCode,
       401,
     );
+  },
+);
+
+test(
+  'quest leaderboard ranks earned XP within each audience and reads current consent',
+  setup,
+  async () => {
+    const endpoint = '/api/quests/leaderboard';
+    assert.equal((await request(endpoint)).statusCode, 401);
+
+    async function seedScore(userId: string, points: number) {
+      await db.quest.create({
+        data: {
+          userId,
+          title: 'Leaderboard fixture',
+          mission: 'Say hello',
+          icebreaker: 'What are you learning?',
+          category: 'Icebreaker',
+          difficulty: 'easy',
+          minutes: 5,
+          status: 'completed',
+          mode: 'rules',
+          award: { create: { userId, points } },
+        },
+      });
+    }
+
+    async function read(cookie: string) {
+      const response = await request(endpoint, 'GET', undefined, cookie);
+      assert.equal(response.statusCode, 200, response.body);
+      return questLeaderboardSchema.parse(response.json());
+    }
+
+    async function consent(person: Awaited<ReturnType<typeof attendee>>, enabled: boolean) {
+      const response = await request(
+        '/api/profile',
+        'PUT',
+        { ...person.profile, showOnQuestLeaderboard: enabled },
+        person.cookie,
+      );
+      assert.equal(response.statusCode, 200, response.body);
+    }
+
+    const viewer = await attendee();
+    await seedScore(viewer.id, 50);
+    assert.deepEqual(await read(viewer.cookie), { leaders: [], viewer: null });
+    await consent(viewer, true);
+    assert.deepEqual((await read(viewer.cookie)).leaders, [
+      { rank: 1, nickname: viewer.profile.nickname, xp: 50, isViewer: true },
+    ]);
+
+    const first = await attendee();
+    await consent(first, true);
+    await seedScore(first.id, 50);
+    await seedScore(first.id, 50);
+    const second = await attendee();
+    await consent(second, true);
+    await seedScore(second.id, 100);
+
+    for (let index = 0; index < 8; index++) {
+      const person = await attendee();
+      await consent(person, true);
+      await seedScore(person.id, 75);
+    }
+
+    const hidden = await attendee(true);
+    await seedScore(hidden.id, 100);
+    const zeroXp = await attendee();
+    await consent(zeroXp, true);
+    const live = await attendee(false, false);
+    await consent(live, true);
+    await seedScore(live.id, 100);
+
+    const board = await read(viewer.cookie);
+    assert.deepEqual(
+      board.leaders.map(({ rank, xp }) => [rank, xp]),
+      [[1, 100], [1, 100], ...Array.from({ length: 8 }, () => [3, 75])],
+    );
+    assert.equal(
+      board.leaders.some(({ isViewer }) => isViewer),
+      false,
+    );
+    assert.deepEqual(board.viewer, { rank: 11, nickname: viewer.profile.nickname, xp: 50 });
+    assert.deepEqual((await read(live.cookie)).leaders, [
+      { rank: 1, nickname: live.profile.nickname, xp: 100, isViewer: true },
+    ]);
+
+    await consent(first, false);
+    const updated = await read(viewer.cookie);
+    assert.ok(!updated.leaders.some(({ nickname }) => nickname === first.profile.nickname));
+    assert.equal(updated.viewer?.rank, 10);
+    await consent(viewer, false);
+    assert.equal((await read(viewer.cookie)).viewer, null);
   },
 );
