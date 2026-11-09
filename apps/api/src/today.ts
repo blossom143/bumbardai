@@ -7,9 +7,10 @@ import { briefingCopy, nextCopy } from './assistant.js';
 import { clock, dayAfter, freeUntil, localDay, overlaps } from './calendar.js';
 import { catalogQuery, catalogSearch, ensureDemoCatalog, nextSession, reasonFor } from './catalog.js';
 import { agenda, nextEvent } from './events.js';
-import { activeQuests, generateQuest, progress } from './quests.js';
+import { activeQuests, generateQuest, icebreaker, progress } from './quests.js';
 import { venueFor, weather } from './weather.js';
 import { db } from './db.js';
+import { findPeople } from './people.js';
 
 export async function briefingContext(user: User) {
   const now = clock(user.demo);
@@ -22,7 +23,8 @@ export async function briefingContext(user: User) {
     weather(day, user.demo, venueFor((current ?? next)?.location)),
     nextSession(user, events),
   ]);
-  const checklistEvent = next ?? events.find(event => !event.completedAt && event.checklist.length);
+  const prepToday = events.find(event => !event.completedAt && event.checklist.length && (!event.endsAt || event.endsAt > now));
+  const checklistEvent = next?.checklist.length ? next : prepToday ?? next;
   const checklist = checklistEvent ? {
     eventId: checklistEvent.id, title: checklistEvent.title, items: checklistEvent.checklist,
   } : null;
@@ -63,12 +65,51 @@ export async function nextAction(user: User, question: string, persistQuest = tr
   return { action, minutes, mode: copy ? 'ai' : 'rules', lead: copy?.lead ?? 'Here’s an option based on your plans.', tips: copy?.tips ?? [] };
 }
 
+async function answer(user: User, question: string) {
+  const now = clock(user.demo);
+  const day = localDay(now);
+  const response = (kind: string, title: string, detail: string, path: string, mode = 'rules') => ({
+    action: { kind, title, detail, path }, mode, minutes: 0, lead: '', tips: [],
+  });
+  if (/ice.?breaker|conversation starter|break the ice/i.test(question)) {
+    const copy = await icebreaker(user);
+    return response('quest', 'Try this conversation starter', copy.icebreaker, '/quests', copy.mode);
+  }
+  if (/weather|forecast|umbrella|jacket|how cold|will it rain/i.test(question)) {
+    const next = await nextEvent(user.id, now);
+    const forecast = await weather(day, user.demo, venueFor(next?.location));
+    const title = forecast.mode === 'demo' ? 'Simulated venue forecast' : forecast.mode === 'stale' ? 'Cached venue forecast' : 'Venue forecast';
+    const detail = forecast.high === null ? 'A forecast is unavailable for this date.'
+      : `Low ${forecast.low}°F, high ${forecast.high}°F. ${forecast.guidance.join(' ')}`;
+    return response('weather', title, detail, '/');
+  }
+  if (/prepare|pack|checklist|what.*bring/i.test(question)) {
+    const events = await agenda(user.id, day, dayAfter(day));
+    const event = (await nextEvent(user.id, now)) ?? events.find(item => !item.completedAt && item.checklist.length);
+    const open = event?.checklist.filter(item => item.status === 'open').map(item => item.label) ?? [];
+    return response('preparation', event?.title ?? 'Preparation checklist',
+      open.length ? open.join(' · ') : 'There are no open preparation items.', '/schedule');
+  }
+  if (/who.*meet|find.*(?:people|attendee|someone)|suggest.*(?:people|connection)/i.test(question)) {
+    const match = (await findPeople(user))[0];
+    return response('people', match?.nickname ?? 'Meet fellow attendees',
+      match ? match.reason + ' “' + match.icebreaker + '”' : 'Check the People tab and enable discovery from Profile if you want to see matches.', '/explore?tab=people');
+  }
+  if (/search.*(?:talks?|sessions?)|find.*(?:talks?|sessions?)|recommend.*(?:talks?|sessions?)/i.test(question) && !/next/i.test(question)) {
+    const results = await catalogSearch(user, catalogQuery.parse({ q: question, limit: 1 }));
+    const item = results.results[0];
+    return response('session', item?.title ?? 'Search conference sessions',
+      item?.reason ?? 'Try a broader topic in Explore.', item ? '/explore?session=' + encodeURIComponent(item.id) : '/explore');
+  }
+  return nextAction(user, question);
+}
+
 export function todayRoutes(app: FastifyInstance) {
   app.get('/api/today', async request => today(await requireUser(request)));
   app.post('/api/assistant', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async request => {
     const user = await requireUser(request);
     const { question } = z.object({ question: z.string().trim().min(1).max(700) }).parse(request.body);
-    return nextAction(user, question);
+    return answer(user, question);
   });
   app.get('/api/catalog/:id', async request => {
     const user = await requireUser(request);

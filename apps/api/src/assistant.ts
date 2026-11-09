@@ -5,11 +5,13 @@ import { traced } from './telemetry.js';
 
 const prose = z.object({ lead: z.string().max(220), tips: z.array(z.string().max(170)).max(3) });
 const questCopy = z.object({ title: z.string().max(90), mission: z.string().max(300), icebreaker: z.string().max(190) });
+const checklistCopy = z.object({ items: z.array(z.string().trim().min(1).max(120)).max(3) });
 const icebreakerCopy = z.object({ icebreaker: z.string().max(190) });
 const prompts = {
   briefing: 'Write a warm, concise morning greeting and up to three short coaching tips. Use only the supplied context. Avoid times, weather, names, and event facts in the copy; factual details are rendered separately.',
   next: 'Coach a first-time attendee on how to use the supplied next action. Keep it brief. Never propose a different activity or invent any schedule, forecast, attendee or venue details.',
   quest: 'Write an achievable, inclusive micro-quest for the attendee in the supplied topic, category, and duration. Include one natural icebreaker. Never imply that a particular person, event, or location exists. Avoid requiring private information.',
+  checklist: 'Suggest up to three short optional preparation tasks based on the event category and attendee goals. Avoid claiming any item is an organizer requirement. Never invent prerequisites, times, or locations. Do not repeat existing checklist labels.',
   icebreaker: 'Write one natural, low-pressure conference icebreaker. Use only supplied interests or the quest topic. Avoid requests for private information and avoid the previous icebreaker.',
 };
 type Capability = keyof typeof prompts;
@@ -42,3 +44,4 @@ export const briefingCopy = (context: unknown) => personalize('briefing', contex
 export const nextCopy = (context: unknown, question: string) => personalize('next', context, prose, question);
 export const newQuestCopy = (context: unknown) => personalize('quest', context, questCopy);
 export const newIcebreaker = (context: unknown) => personalize('icebreaker', context, icebreakerCopy);
+export const preparationCopy = (context: unknown) => personalize('checklist', context, checklistCopy);

@@ -1,4 +1,4 @@
-import { useDeferredValue, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, CalendarPlus, Compass, Search, Users } from 'lucide-react';
 import { interests } from '@hallway/shared';
@@ -9,6 +9,14 @@ import { SessionDetails } from './today';
 
 type Person = { id: string; nickname: string; background?: string; shared: string[]; reason: string; icebreaker: string };
 type Intro = { id: string; personId: string; nickname: string; status: string; incoming: boolean };
+function MatchIcebreaker({ person }: { person: Person }) {
+  const ice = useAction<{ icebreaker: string; mode: string }, void>(() =>
+    api('/icebreaker', 'POST', { topic: person.shared[0] }));
+  return <><p className="reason">“{ice.data?.icebreaker ?? person.icebreaker}”</p>
+    {ice.data && <p className="muted">{ice.data.mode === 'ai' ? 'AI conversation starter' : 'Rules-based conversation starter'}</p>}
+    <Button variant="ghost" disabled={ice.isPending} onClick={() => ice.mutate()}>New conversation starter</Button>
+    <ErrorText error={ice.error}/></>;
+}
 function People({ user }: { user: User }) {
   const query = useQuery({ queryKey: ['people'], queryFn: () => api<{ people: Person[]; introductions: Intro[] }>('/people') });
   const intro = useAction<unknown, string>(id => api('/people/' + id + '/intro', 'POST', {}), ['people']);
@@ -24,7 +32,7 @@ function People({ user }: { user: User }) {
       <div className="section-label"><span className="tile mint"><Users size={18}/></span> ATTENDEE MATCH</div>
       <h2>{person.nickname}</h2>{person.background && <p>{person.background}</p>}
       <p className="muted">{person.reason}</p><div className="chips">{person.shared.map(tag => <span className="chip" key={tag}>{tag}</span>)}</div>
-      <p className="reason">“{person.icebreaker}”</p>
+      <MatchIcebreaker person={person}/>
       <Button variant="secondary" disabled={intro.isPending || query.data.introductions.some(item => item.personId === person.id)}
         onClick={() => intro.mutate(person.id)}>Request introduction</Button>
     </article>)}</div>
@@ -40,7 +48,11 @@ export function Explore({ user }: { user: User }) {
   const [topic, setTopic] = useState('');
   const [skill, setSkill] = useState('');
   const [limit, setLimit] = useState(12);
-  const q = useDeferredValue(input);
+  const [q, setQuery] = useState('');
+  useEffect(() => {
+    const debounce = setTimeout(() => setQuery(input.trim()), 350);
+    return () => clearTimeout(debounce);
+  }, [input]);
   const id = params.get('session');
   const query = useQuery({ queryKey: ['catalog', q, day, topic, skill, limit], enabled: !people, queryFn: () => api<{ results: Catalog[]; mode: string }>(
     '/catalog?' + new URLSearchParams({ q, ...(day ? { day } : {}), ...(topic ? { topic } : {}), ...(skill ? { skill } : {}), limit: String(limit) })) });

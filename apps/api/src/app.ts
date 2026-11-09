@@ -15,7 +15,7 @@ import { reminderRoutes } from './reminders.js';
 import { questRoutes } from './quests.js';
 
 export async function createApp({ logger = false } = {}) {
-  const app = Fastify({ logger, bodyLimit: 1024 * 1024, trustProxy: process.env.TRUST_PROXY === 'true' });
+  const app = Fastify({ logger, disableRequestLogging: true, bodyLimit: 1024 * 1024, trustProxy: process.env.TRUST_PROXY === 'true' });
   const spans = new WeakMap<object, Span>();
   await app.register(cookie);
   await app.register(rateLimit, { global: false });

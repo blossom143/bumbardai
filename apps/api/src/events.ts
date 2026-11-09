@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { Prisma } from '@prisma/client';
-import { dateKey, eventInput, timeZone, type EventInput } from '@hallway/shared';
+import { dateKey, eventInput, profileInput, timeZone, type EventInput } from '@hallway/shared';
 import { z } from 'zod';
 import { HttpError, requireUser } from './auth.js';
 import { atLocal, clock, dayAfter, localDay, overlaps, readIcs, writeIcs, zone } from './calendar.js';
 import { db } from './db.js';
+import { preparationCopy } from './assistant.js';
 
 const checklistTemplates: Record<string, string[]> = {
   hackathon: ['Pack your laptop', 'Pack your charger', 'Check GitHub access', 'Set up development tools', 'Review registration details'],
@@ -76,6 +77,7 @@ export function eventRoutes(app: FastifyInstance) {
   app.get('/api/events', async request => {
     const user = await requireUser(request);
     const { from, until } = z.object({ from: dateKey.optional(), until: dateKey.optional() }).parse(request.query);
+    if ((from && !until) || (!from && until) || (from && until && until <= from)) throw new HttpError(400, 'Provide both dates, with until after from.');
     return agenda(user.id, from, until);
   });
   const saveInput = z.object({ event: eventInput, confirmConflict: z.boolean().default(false) });
@@ -121,6 +123,29 @@ export function eventRoutes(app: FastifyInstance) {
     const { label } = z.object({ label: z.string().trim().min(1).max(180) }).parse(request.body);
     await ownedEvent(user.id, id);
     return db.checklistItem.create({ data: { eventId: id, label } });
+  });
+  app.post('/api/events/:id/preparation', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async request => {
+    const user = await requireUser(request);
+    const { id } = eventId.parse(request.params);
+    const event = await db.event.findFirst({ where: { id, userId: user.id }, include: { checklist: true } });
+    if (!event) throw new HttpError(404, 'Event not found.');
+    const profile = profileInput.safeParse(user.profile).data;
+    const copy = await preparationCopy({ category: event.category, title: event.title,
+      interests: profile?.interests, goals: profile?.goals, existing: event.checklist.map(item => item.label) });
+    const fallback = ['Review the activity details', 'Allow time to get to the venue'];
+    const added = await db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Event" WHERE id = ${id} FOR UPDATE`;
+      const known = new Set((await tx.checklistItem.findMany({ where: { eventId: id } })).map(item => item.label.trim().toLowerCase()));
+      const labels = (copy?.items ?? fallback).filter(label => {
+        const key = label.trim().toLowerCase();
+        if (known.has(key)) return false;
+        known.add(key);
+        return true;
+      });
+      const result = await tx.checklistItem.createMany({ data: labels.map(label => ({ eventId: id, label })) });
+      return result.count;
+    });
+    return { added, mode: copy ? 'ai' : 'rules' };
   });
   app.patch('/api/checklist/:id', async request => {
     const user = await requireUser(request);

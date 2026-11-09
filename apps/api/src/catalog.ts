@@ -1,5 +1,5 @@
 import { type CatalogItem, type User } from '@prisma/client';
-import { officialSchedule, hackathonSource, profileInput } from '@hallway/shared';
+import { officialSchedule, profileInput } from '@hallway/shared';
 import { z } from 'zod';
 import { atLocal, clock, localDay, overlaps } from './calendar.js';
 import { db } from './db.js';
@@ -8,7 +8,7 @@ import { sessionSearch } from './search.js';
 export const catalogQuery = z.object({
   q: z.string().trim().max(250).default(''), day: z.string().date().optional(),
   topic: z.string().trim().max(100).optional(), skill: z.string().trim().max(40).optional(),
-  onlyFitting: z.coerce.boolean().optional(), limit: z.coerce.number().int().min(1).max(50).default(25),
+  limit: z.coerce.number().int().min(1).max(50).default(25),
 });
 export type CatalogQuery = z.infer<typeof catalogQuery>;
 const replayDay = '2026-11-10';
@@ -28,12 +28,6 @@ const replay = [
 export async function ensureDemoCatalog() {
   await db.catalogItem.createMany({ data: replay, skipDuplicates: true });
 }
-
-export const catalogFilter = (user: User, input: CatalogQuery) => ({
-  demo: user.demo, active: true, ...(input.day ? { day: input.day } : {}),
-  ...(input.topic ? { topics: { has: input.topic } } : {}),
-  ...(input.skill ? { skill: input.skill } : {}),
-});
 
 export function reasonFor(item: CatalogItem, interests: string[], q = '') {
   const haystack = [item.title, item.description, ...item.topics].join(' ').toLowerCase();
@@ -89,5 +83,3 @@ export async function nextSession(user: User, events: Awaited<ReturnType<typeof 
   const item = available.find(item => reasonFor(item, interests).startsWith('Matches')) ?? available[0];
   return item ? { ...item, reason: reasonFor(item, interests) } : null;
 }
-
-export const sourceMeta = { officialSchedule, hackathonSource };

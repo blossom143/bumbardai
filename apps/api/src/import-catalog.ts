@@ -6,6 +6,16 @@ import { officialSchedule, hackathonSource } from '@hallway/shared';
 import { atLocal, localDay } from './calendar.js';
 import { db } from './db.js';
 
+const topicPatterns = {
+  Kubernetes: /\bkubernetes\b|\bk8s\b/i,
+  Go: /\bgolang\b|\bgo (?:language|modules|programming|developers|toolchain)\b|written in go\b|\bwith Go\b/,
+  AI: /\bAI\b|\bLLMs?\b|machine learning|inference/i,
+  DevOps: /\bdevops\b|gitops|CI\/CD|continuous delivery/i,
+  Security: /security|secure|supply chain|threat model/i,
+  Observability: /observability|opentelemetry|distributed tracing/i,
+  eBPF: /\bebpf\b/i,
+  'Open Source': /open.source|contribfest|maintainer/i,
+};
 const feedUrl = 'https://sessionize.com/api/v2/svi82w6c/view/All';
 const schema = z.object({
   speakers: z.array(z.object({ id: z.string(), fullName: z.string() })),
@@ -36,8 +46,11 @@ export function normalizeFeed(payload: unknown) {
     days.add(day);
     const labels = session.categoryItems.flatMap(id => tags.get(id) ?? []);
     const skill = labels.find(label => label.type === 'Audience Level')?.name ?? null;
-    const topics = [...new Set(labels.filter(label => label.type !== 'Audience Level').map(label => label.name))];
     const title = session.title.trim().slice(0, 200);
+    const trackNames = labels.filter(label => label.type !== 'Audience Level').map(label => label.name);
+    const content = [title, session.description, ...trackNames].join(' ');
+    const inferred = Object.entries(topicPatterns).filter(([, pattern]) => pattern.test(content)).map(([topic]) => topic);
+    const topics = [...new Set([...trackNames, ...inferred])];
     const id = 'kubecon-na-2026:' + session.id;
     const category = /hackathon/i.test(title) ? 'hackathon' : /workshop|contribfest|tutorial/i.test(title) ? 'workshop'
       : /networking|meetup|reception/i.test(title) ? 'networking' : 'session';

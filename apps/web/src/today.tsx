@@ -13,6 +13,8 @@ export function EventRow({ event }: { event: Event }) {
 }
 export function Checklist({ eventId, items }: { eventId: string; items: Item[] }) {
   const change = useAction<Item, { id: string; status?: string; label?: string }>(({ id, ...value }) => api('/checklist/' + id, 'PATCH', value), ['today', 'events']);
+  const suggestions = useAction<{ added: number; mode: string }, void>(() =>
+    api('/events/' + eventId + '/preparation', 'POST', {}), ['today', 'events']);
   const add = useAction<Item, string>(label => api('/events/' + eventId + '/checklist', 'POST', { label }), ['today', 'events']);
   return <div>
     {items.filter(item => item.status !== 'dismissed').map(item => <div className="check-row" key={item.id}>
@@ -26,7 +28,9 @@ export function Checklist({ eventId, items }: { eventId: string; items: Item[] }
       event.preventDefault(); const form = event.currentTarget;
       add.mutate(String(new FormData(form).get('label')), { onSuccess: () => form.reset() });
     }}><input name="label" aria-label="New checklist item" required maxLength={180}/><Button type="submit" variant="secondary">Add</Button></form></details>
-    <ErrorText error={change.error || add.error}/>
+    <Button variant="secondary" disabled={suggestions.isPending} onClick={() => suggestions.mutate()}><Sparkles size={15}/> Suggest prep items</Button>
+    {suggestions.data && <p className="muted" role="status">{suggestions.data.added} added · {suggestions.data.mode === 'ai' ? 'AI suggestions' : 'Rules-based suggestions'}</p>}
+    <ErrorText error={change.error || add.error || suggestions.error}/>
   </div>;
 }
 export function SessionDetails({ item }: { item: Catalog }) {
@@ -40,6 +44,9 @@ export function SessionDetails({ item }: { item: Catalog }) {
 }
 
 export function Today({ user, ask }: { user: User; ask: () => void }) {
+  const people = useQuery({ queryKey: ['people'], queryFn: () => api<{ people: { nickname: string; reason: string }[] }>('/people'),
+    enabled: !!user.profile?.discoverable });
+  const match = people.data?.people[0];
   const query = useQuery({ queryKey: ['today'], queryFn: () => api<TodayData>('/today'), staleTime: 60000 });
   if (query.isPending) return <Loading/>;
   if (!query.data) return <><ErrorText error={query.error}/><Button onClick={() => void query.refetch()}>Retry</Button></>;
@@ -84,6 +91,11 @@ export function Today({ user, ask }: { user: User; ask: () => void }) {
         <strong className="xp-number">{progress.xp} XP</strong><div className="progress-track"><div style={{ width: (progress.xp % 100) + '%' }}/></div>
         <p className="muted">Level {progress.level} · {100 - progress.xp % 100} XP to your next level</p>
         <Link className="text-link" to="/profile">See achievements <ArrowRight size={16}/></Link>
+      </section>
+      <section className="card dashboard-card">
+        <div className="section-heading"><span className="tile mint"><Star size={19}/></span><h2>Who to meet</h2></div>
+        {match ? <><h3>{match.nickname}</h3><p className="muted">{match.reason}</p></> : <p className="muted">Discover attendees who share your interests when you’re ready to meet someone.</p>}
+        <Link className="text-link" to="/explore?tab=people">Explore attendee matches <ArrowRight size={16}/></Link>
       </section>
       {forecast.updatedAt && <p className="muted weather-credit">{forecast.mode === 'demo' ? 'Simulated forecast for the guided demo' : (forecast.mode === 'stale' ? 'Cached forecast' : 'Forecast') + ' updated ' + time(forecast.updatedAt)}{forecast.mode !== 'demo' && <> · <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a></>}</p>}
     </div>
