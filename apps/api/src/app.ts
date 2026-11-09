@@ -10,6 +10,7 @@ import { authRoutes, HttpError } from './auth.js';
 import { eventRoutes } from './events.js';
 import { todayRoutes } from './today.js';
 import { peopleRoutes } from './people.js';
+import { mcpRoutes } from './mcp.js';
 import { questRoutes } from './quests.js';
 
 export async function createApp({ logger = false } = {}) {
@@ -57,6 +58,7 @@ export async function createApp({ logger = false } = {}) {
   todayRoutes(app);
   questRoutes(app);
   peopleRoutes(app);
+  mcpRoutes(app);
   const webRoot = resolve(process.env.WEB_ROOT || '../web/dist');
   if (existsSync(webRoot + '/index.html')) {
     await app.register(staticFiles, { root: webRoot, wildcard: false });

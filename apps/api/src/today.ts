@@ -42,7 +42,7 @@ export async function today(user: User) {
     tips: copy?.tips ?? (profile?.firstTime ? ['Give yourself a moment to get oriented between activities.'] : []) } };
 }
 
-export async function nextAction(user: User, question: string) {
+export async function nextAction(user: User, question: string, persistQuest = true) {
   const now = clock(user.demo);
   const day = localDay(now);
   const events = await agenda(user.id, day, dayAfter(day));
@@ -52,7 +52,7 @@ export async function nextAction(user: User, question: string) {
   const minutes = Math.max(0, Math.floor((+cutoff - +now) / 60000));
   const current = events.find(event => overlaps(now, new Date(+now + 1), event));
   const session = await nextSession(user, events, cutoff);
-  const quest = minutes >= 5 && !session ? await generateQuest(user) : null;
+  const quest = minutes >= 5 && !session ? await generateQuest(user, persistQuest) : null;
   const next = await nextEvent(user.id, now);
   const action = current ? { kind: 'event', title: current.title, detail: 'This activity is on your schedule now.', path: '/schedule' }
     : session ? { kind: 'session', title: session.title, detail: session.reason, path: '/explore' }

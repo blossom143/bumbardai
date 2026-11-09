@@ -31,7 +31,7 @@ export async function progress(userId: string) {
   return { xp, level: 1 + Math.floor(xp / 100), badges: badges.map(badge => badge.name), completed };
 }
 
-export async function generateQuest(user: User) {
+export async function generateQuest(user: User, persist = true) {
   const existing = (await activeQuests(user.id))[0];
   if (existing) return existing;
   const profile = profileInput.safeParse(user.profile).data;
@@ -39,23 +39,28 @@ export async function generateQuest(user: User) {
   const day = localDay(now);
   const events = await agenda(user.id);
   const freeMinutes = Math.floor((+freeUntil(now, events) - +now) / 60000);
-  const done = await db.quest.findMany({ where: { userId: user.id, status: 'completed' }, orderBy: { createdAt: 'desc' }, take: 5 });
-  const template = (done.length === 0 && profile?.comfort !== 'quiet' ? categories[0]
-    : done.length === 0 ? categories[4] : categories[done.length % categories.length])!;
+  const [done, completed] = await Promise.all([
+    db.quest.findMany({ where: { userId: user.id, status: 'completed' }, orderBy: { createdAt: 'desc' }, take: 5 }),
+    db.quest.count({ where: { userId: user.id, status: 'completed' } }),
+  ]);
+  const template = (completed === 0 && profile?.comfort !== 'quiet' ? categories[0]
+    : completed === 0 ? categories[4] : categories[completed % categories.length])!;
   const topic = profile?.interests[0] ?? 'cloud native projects';
   const difficulty = profile?.difficulty ?? 'easy';
   const minutes = Math.min(difficulty === 'hard' ? 20 : difficulty === 'medium' ? 12 : 5, Math.max(5, freeMinutes));
   const copy = await newQuestCopy({ topic, category: template.category, minutes, difficulty, freeMinutes,
     day, goals: profile?.goals, background: profile?.background, comfort: profile?.comfort, currentEventCategory: events.find(event => event.startsAt && event.endsAt && event.startsAt <= now && event.endsAt > now)?.category,
     priorCategories: done.map(quest => quest.category) });
+  const data = {
+    userId: user.id, difficulty, minutes, category: template.category, mode: copy ? 'ai' : 'rules',
+    ...(copy ?? { title: template.title, mission: template.mission.replace('TOPIC', topic), icebreaker: template.icebreaker.replace('TOPIC', topic) }),
+  };
+  if (!persist) return { ...data, status: 'preview' as const };
   return db.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id} FOR UPDATE`;
     const active = await tx.quest.findFirst({ where: { userId: user.id, status: { in: ['suggested', 'active'] } } });
     if (active) return active;
-    return tx.quest.create({ data: {
-      userId: user.id, difficulty, minutes, category: template.category, mode: copy ? 'ai' : 'rules',
-      ...(copy ?? { title: template.title, mission: template.mission.replace('TOPIC', topic), icebreaker: template.icebreaker.replace('TOPIC', topic) }),
-    } });
+    return tx.quest.create({ data });
   });
 }
 

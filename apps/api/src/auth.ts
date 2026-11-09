@@ -46,6 +46,7 @@ export function authRoutes(app: FastifyInstance) {
   app.get('/api/me', async request => publicUser(await requireUser(request)));
   app.post('/api/auth/register', { config: { rateLimit: { max: 8, timeWindow: '1 minute' } } }, async (request, reply) => {
     const { email, password, demo } = credentials.extend({ demo: z.boolean().default(false) }).parse(request.body);
+    if (email.endsWith('@demo.invalid')) throw new HttpError(400, 'Use a different email address.');
     try {
       const user = await db.user.create({ data: { email, demo, passwordHash: await hash(password, passwordOptions) } });
       await startSession(request, reply, user.id);
