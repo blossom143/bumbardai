@@ -8,7 +8,7 @@ import { Button, dayLabel, Empty, ErrorText, Heading, Loading, Sheet, time } fro
 import { SessionDetails } from './today';
 
 type Person = { id: string; nickname: string; background?: string; shared: string[]; reason: string; icebreaker: string };
-type Intro = { id: string; nickname: string; status: string; incoming: boolean };
+type Intro = { id: string; personId: string; nickname: string; status: string; incoming: boolean };
 function People({ user }: { user: User }) {
   const query = useQuery({ queryKey: ['people'], queryFn: () => api<{ people: Person[]; introductions: Intro[] }>('/people') });
   const intro = useAction<unknown, string>(id => api('/people/' + id + '/intro', 'POST', {}), ['people']);
@@ -25,7 +25,7 @@ function People({ user }: { user: User }) {
       <h2>{person.nickname}</h2>{person.background && <p>{person.background}</p>}
       <p className="muted">{person.reason}</p><div className="chips">{person.shared.map(tag => <span className="chip" key={tag}>{tag}</span>)}</div>
       <p className="reason">“{person.icebreaker}”</p>
-      <Button variant="secondary" disabled={intro.isPending || query.data.introductions.some(item => item.id === person.id)}
+      <Button variant="secondary" disabled={intro.isPending || query.data.introductions.some(item => item.personId === person.id)}
         onClick={() => intro.mutate(person.id)}>Request introduction</Button>
     </article>)}</div>
     {query.data?.people.length === 0 && <Empty title="No matches yet">Attendees can choose to appear here from their profile.</Empty>}

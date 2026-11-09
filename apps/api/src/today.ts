@@ -2,13 +2,14 @@ import type { User } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import { profileInput } from '@hallway/shared';
 import { z } from 'zod';
-import { requireUser } from './auth.js';
+import { HttpError, requireUser } from './auth.js';
 import { briefingCopy, nextCopy } from './assistant.js';
 import { clock, dayAfter, freeUntil, localDay, overlaps } from './calendar.js';
-import { catalogQuery, catalogSearch, nextSession } from './catalog.js';
+import { catalogQuery, catalogSearch, ensureDemoCatalog, nextSession, reasonFor } from './catalog.js';
 import { agenda, nextEvent } from './events.js';
 import { activeQuests, generateQuest, progress } from './quests.js';
 import { venueFor, weather } from './weather.js';
+import { db } from './db.js';
 
 export async function briefingContext(user: User) {
   const now = clock(user.demo);
@@ -68,6 +69,14 @@ export function todayRoutes(app: FastifyInstance) {
     const user = await requireUser(request);
     const { question } = z.object({ question: z.string().trim().min(1).max(700) }).parse(request.body);
     return nextAction(user, question);
+  });
+  app.get('/api/catalog/:id', async request => {
+    const user = await requireUser(request);
+    const { id } = z.object({ id: z.string().max(200) }).parse(request.params);
+    if (user.demo) await ensureDemoCatalog();
+    const item = await db.catalogItem.findFirst({ where: { id, demo: user.demo, active: true } });
+    if (!item) throw new HttpError(404, 'Session not found.');
+    return { ...item, reason: reasonFor(item, profileInput.safeParse(user.profile).data?.interests ?? []) };
   });
   app.get('/api/catalog', async request => catalogSearch(await requireUser(request), catalogQuery.parse(request.query)));
 }

@@ -9,6 +9,7 @@ import { ZodError } from 'zod';
 import { authRoutes, HttpError } from './auth.js';
 import { eventRoutes } from './events.js';
 import { todayRoutes } from './today.js';
+import { peopleRoutes } from './people.js';
 import { questRoutes } from './quests.js';
 
 export async function createApp({ logger = false } = {}) {
@@ -55,6 +56,7 @@ export async function createApp({ logger = false } = {}) {
   eventRoutes(app);
   todayRoutes(app);
   questRoutes(app);
+  peopleRoutes(app);
   const webRoot = resolve(process.env.WEB_ROOT || '../web/dist');
   if (existsSync(webRoot + '/index.html')) {
     await app.register(staticFiles, { root: webRoot, wildcard: false });

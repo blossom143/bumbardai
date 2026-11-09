@@ -60,7 +60,7 @@ export function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/login', { config: { rateLimit: { max: 8, timeWindow: '1 minute' } } }, async (request, reply) => {
     const { email, password } = credentials.parse(request.body);
     const user = await db.user.findUnique({ where: { email } });
-    if (!await verify(user?.passwordHash ?? await dummyHash, password) || !user) throw new HttpError(401, 'Invalid email or password.');
+    if (!await verify(user?.passwordHash.startsWith('$argon2') ? user.passwordHash : await dummyHash, password) || !user) throw new HttpError(401, 'Invalid email or password.');
     await startSession(request, reply, user.id);
     return publicUser(user);
   });

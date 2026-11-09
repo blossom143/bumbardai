@@ -3,6 +3,7 @@ import { officialSchedule, hackathonSource, profileInput } from '@hallway/shared
 import { z } from 'zod';
 import { atLocal, clock, localDay, overlaps } from './calendar.js';
 import { db } from './db.js';
+import { sessionSearch } from './search.js';
 
 export const catalogQuery = z.object({
   q: z.string().trim().max(250).default(''), day: z.string().date().optional(),
@@ -44,10 +45,24 @@ export function reasonFor(item: CatalogItem, interests: string[], q = '') {
 
 export async function catalogSearch(user: User, input: CatalogQuery) {
   if (user.demo) await ensureDemoCatalog();
-  const rows = await db.catalogItem.findMany({
-    where: catalogFilter(user, input), orderBy: [{ day: 'asc' }, { startsAt: 'asc' }, { title: 'asc' }],
+  const all = await db.catalogItem.findMany({
+    where: { demo: user.demo, active: true }, orderBy: [{ day: 'asc' }, { startsAt: 'asc' }, { title: 'asc' }],
   });
   const interests = profileInput.safeParse(user.profile).data?.interests ?? [];
+  const filters = [
+    ...(input.day ? [{ term: { day: input.day } }] : []),
+    ...(input.topic ? [{ term: { topics: input.topic } }] : []),
+    ...(input.skill ? [{ term: { skill: input.skill } }] : []),
+  ];
+  const rows = all.filter(item => (!input.day || input.day === item.day) &&
+    (!input.topic || item.topics.includes(input.topic)) && (!input.skill || item.skill === input.skill));
+  const ranked = await sessionSearch(input.q, all.map(item => ({ id: item.id, demo: item.demo, title: item.title,
+    text: [item.description, ...item.speakers].join(' '), topics: item.topics, day: item.day, skill: item.skill })), user.demo, filters);
+  const byId = new Map(rows.map(row => [row.id, row]));
+  if (ranked) return { mode: ranked.mode, results: ranked.ids.flatMap(id => {
+    const item = byId.get(id);
+    return item ? [{ ...item, reason: reasonFor(item, interests, input.q) }] : [];
+  }).slice(0, input.limit) };
   const tokens = input.q.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
   const results = rows.map(item => {
     const title = item.title.toLowerCase();
@@ -55,7 +70,7 @@ export async function catalogSearch(user: User, input: CatalogQuery) {
     const score = tokens.reduce((rank, term) => rank + (title.includes(term) ? 3 : body.includes(term) ? 1 : 0), 0);
     return { item, score };
   });
-  return { mode: 'catalog', results: results.filter(({ score }) => !tokens.length || score > 0)
+  return { mode: input.q ? 'keyword' : 'catalog', results: results.filter(({ score }) => !tokens.length || score > 0)
     .sort((a, b) => b.score - a.score).slice(0, input.limit)
     .map(({ item }) => ({ ...item, reason: reasonFor(item, interests, input.q) })) };
 }
