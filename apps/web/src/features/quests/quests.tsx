@@ -11,6 +11,7 @@ import { motion } from 'framer-motion';
 import { Camera, Compass, MessageCircle, QrCode, Sparkles, Timer, Trophy, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api, useAction, useResource, type Award, type Quest } from '../../shared/api';
+import { QuestProgressMap } from './quest-progress-map';
 import {
   Input,
   Card,
@@ -228,6 +229,7 @@ export function Quests() {
           </Button>
         }
       />
+      <QuestProgressMap quests={query.data ?? []} />
       {query.loading && <Loading />}
       <ErrorText error={query.error || create.error} />
       {available ? (
