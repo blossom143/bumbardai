@@ -8,7 +8,7 @@ import { db } from './shared/db.js';
 import { importCatalog } from './features/explore/import-catalog.js';
 import { runReminderCycle } from './features/reminders/reminders.js';
 import { weather } from './features/today/weather.js';
-import { scheduleIntentSchema } from '@hallway/shared/responses';
+import { assistantTurnSchema, scheduleIntentSchema } from '@hallway/shared/responses';
 import { z } from 'zod';
 
 let app: FastifyInstance;
@@ -227,7 +227,7 @@ test(
         { question: 'Tomorrow from 1 to 2' },
         a.cookie,
       );
-      assert.match(created.json().messages[1].content, /Added “Lunch with the team”/);
+      assert.equal(created.json().messages[1].action.savedActivity.title, 'Lunch with the team');
       assert.equal((await request('/api/events', 'GET', undefined, a.cookie)).json().length, 1);
 
       await addEvent(a.cookie, {
@@ -272,6 +272,49 @@ test(
         else process.env[key] = value;
       }
     }
+  },
+);
+
+test(
+  'Scout suggests without writing, saves one published session, and deduplicates retries',
+  setup,
+  async () => {
+    const owner = await attendee();
+    const ask = async (question: string) => {
+      const response = await request('/api/assistant', 'POST', { question }, owner.cookie);
+      assert.equal(response.statusCode, 200, response.body);
+      return assistantTurnSchema.parse(response.json()).messages[1];
+    };
+    const events = async () =>
+      (await request('/api/events', 'GET', undefined, owner.cookie)).json();
+    const recommendation = await ask('Find me a Go session before 1 pm');
+    assert.equal(recommendation.action?.kind, 'session');
+    assert.match(recommendation.content, /Go tools for cloud native beginners/);
+    assert.deepEqual(await events(), []);
+    const saved = await ask('Add it');
+    const savedActivity = saved.action?.savedActivity;
+    assert.ok(savedActivity);
+    assert.equal(savedActivity.title, 'Go tools for cloud native beginners');
+    assert.equal(savedActivity.startsAt, '2026-11-10T18:30:00.000Z');
+    assert.match(savedActivity.reason, /Go/);
+    const duplicate = await ask('Schedule a Go session before 1 pm');
+    assert.equal(duplicate.action?.savedActivity?.id, savedActivity.id);
+    assert.equal((await events()).length, 1);
+
+    const ambiguous = await ask('Schedule an observability workshop at 3');
+    assert.match(ambiguous.content, /Which date and time/);
+    await addEvent(owner.cookie, {
+      ...activity,
+      title: 'Busy afternoon',
+      startsAt: '2026-11-10T22:00:00Z',
+      endsAt: '2026-11-10T23:30:00Z',
+    });
+    const conflict = await ask('Schedule an observability workshop this afternoon');
+    assert.match(conflict.content, /couldn’t find a matching session/);
+    assert.equal((await events()).length, 2);
+    const personal = await ask('Add coffee tomorrow from 13:00 to 14:00');
+    assert.equal(personal.action?.savedActivity?.title, 'coffee');
+    assert.equal(personal.action?.savedActivity?.startsAt, '2026-11-11T20:00:00.000Z');
   },
 );
 

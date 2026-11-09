@@ -2,9 +2,50 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Compass, Trash2 } from 'lucide-react';
 import { z } from 'zod';
-import { assistantHistorySchema, assistantTurnSchema } from '@hallway/shared/responses';
+import {
+  assistantActionSchema,
+  assistantHistorySchema,
+  assistantTurnSchema,
+} from '@hallway/shared/responses';
 import { api, useAction, useResource } from '../../shared/api';
 import { Button, ErrorText, Loading, Sheet, Textarea } from '../../shared/ui';
+
+type Activity = NonNullable<z.infer<typeof assistantActionSchema>['savedActivity']>;
+
+function SavedActivity({ activity, close }: { activity: Activity; close: () => void }) {
+  const date = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: activity.zone,
+  });
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: activity.zone,
+    timeZoneName: 'short',
+  });
+  return (
+    <div className="mt-2 space-y-1 rounded-xl border border-border bg-card p-3">
+      <strong>{activity.title}</strong>
+      <p>
+        {activity.startsAt && activity.endsAt
+          ? date.format(new Date(activity.startsAt)) +
+            ' – ' +
+            time.format(new Date(activity.endsAt))
+          : (activity.day ?? 'Time TBD')}
+      </p>
+      {activity.location && <p>{activity.location}</p>}
+      <p className="muted">{activity.reason}</p>
+      <Link
+        className="text-link"
+        to={'/schedule?edit=' + encodeURIComponent(activity.id)}
+        onClick={close}
+      >
+        Edit activity <ArrowRight size={15} />
+      </Link>
+    </div>
+  );
+}
 
 function ScoutAvatar() {
   return (
@@ -126,11 +167,15 @@ export function AssistantSheet({
                   </span>
                 )}
                 <p>{message.content}</p>
-                {message.action && (
-                  <Link className="text-link" to={message.action.path} onClick={close}>
-                    {message.action.kind === 'event' ? 'Open schedule' : 'Explore this'}{' '}
-                    <ArrowRight size={15} />
-                  </Link>
+                {message.action?.savedActivity ? (
+                  <SavedActivity activity={message.action.savedActivity} close={close} />
+                ) : (
+                  message.action && (
+                    <Link className="text-link" to={message.action.path} onClick={close}>
+                      {message.action.kind === 'event' ? 'Open schedule' : 'Explore this'}{' '}
+                      <ArrowRight size={15} />
+                    </Link>
+                  )
                 )}
               </div>
             </div>
@@ -143,6 +188,23 @@ export function AssistantSheet({
           <div className="scout-bottom" />
         </div>
 
+        <div className="button-row" aria-label="Starter messages">
+          {[
+            'Find me a Kubernetes session this afternoon',
+            'Schedule a session based on my interests',
+          ].map((prompt) => (
+            <Button
+              key={prompt}
+              type="button"
+              variant="secondary"
+              onClick={() => setQuestion(prompt)}
+              disabled={action.loading}
+              className="h-auto whitespace-normal text-left"
+            >
+              {prompt}
+            </Button>
+          ))}
+        </div>
         <ErrorText error={history.error || action.error || clear.error} />
         <form
           className="form scout-composer"
