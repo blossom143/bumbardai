@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: hallway-quest
+resources:
+  - ../app
+  - tunnel.yaml
+configMapGenerator:
+  - name: hallway-config
+    behavior: merge
+    literals:
+      - PUBLIC_ORIGIN=https://bumbardai.openlib.dev

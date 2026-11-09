@@ -42,7 +42,7 @@ spec:
   wait: true
   dependsOn:
     - name: hallway-migrate
-  path: ./deploy/kubernetes/app
+  path: ./deploy/kubernetes/app-cloudflare
   sourceRef:
     kind: GitRepository
     name: hallway-quest

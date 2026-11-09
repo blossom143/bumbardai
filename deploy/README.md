@@ -67,6 +67,17 @@ kubectl -n hallway-quest port-forward svc/hallway-quest 3000:3000
 
 Visit [Hallway Quest](http://localhost:3000/). For shared HTTPS access, edit [the example Ingress](kubernetes/app/ingress.example.yaml), provision its TLS secret, add it to the app's resource list, and set `PUBLIC_ORIGIN` to the matching HTTPS origin.
 
+### Cloudflare Tunnel for bumbardai.openlib.dev
+
+The [Cloudflare overlay](kubernetes/app-cloudflare/kustomization.yaml) connects the public hostname to the existing ClusterIP Service. It sets the app's HTTPS origin and runs one connector authenticated via the tunnel token. In `hallway-quest`, provision the `hallway-cloudflare-tunnel` Secret with `TUNNEL_TOKEN`. Keep the token outside Git.
+
+```sh
+kubectl -n hallway-quest create secret generic hallway-cloudflare-tunnel \
+  --from-literal=TUNNEL_TOKEN="<your-tunnel-token>"
+```
+
+Point the `hallway-app` Flux Kustomization to `./deploy/kubernetes/app-cloudflare` instead of the base app directory. In Cloudflare Zero Trust, add `bumbardai.openlib.dev` under the tunnel's Public Hostnames pointing to `http://hallway-quest:3000`. Verify the connector is ready and the public health endpoint responds at `https://bumbardai.openlib.dev/api/health`.
+
 ## Validate changes
 
 ```sh
