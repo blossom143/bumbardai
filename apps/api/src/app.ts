@@ -8,6 +8,8 @@ import { existsSync } from 'node:fs';
 import { ZodError } from 'zod';
 import { authRoutes, HttpError } from './auth.js';
 import { eventRoutes } from './events.js';
+import { todayRoutes } from './today.js';
+import { questRoutes } from './quests.js';
 
 export async function createApp({ logger = false } = {}) {
   const app = Fastify({ logger, bodyLimit: 1024 * 1024, trustProxy: process.env.TRUST_PROXY === 'true' });
@@ -51,6 +53,8 @@ export async function createApp({ logger = false } = {}) {
   app.get('/api/health', async () => ({ status: 'ok' }));
   authRoutes(app);
   eventRoutes(app);
+  todayRoutes(app);
+  questRoutes(app);
   const webRoot = resolve(process.env.WEB_ROOT || '../web/dist');
   if (existsSync(webRoot + '/index.html')) {
     await app.register(staticFiles, { root: webRoot, wildcard: false });
