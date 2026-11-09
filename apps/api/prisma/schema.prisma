@@ -137,13 +137,15 @@ model Introduction {
 }
 
 model McpToken {
-  id        String   @id @default(uuid())
-  digest    String   @unique
-  userId    String
-  label     String
-  canWrite  Boolean
-  expiresAt DateTime
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String          @id @default(uuid())
+  digest      String          @unique
+  userId      String
+  label       String
+  canWrite    Boolean
+  canSchedule Boolean         @default(false)
+  oauthGrants McpOAuthGrant[]
+  expiresAt   DateTime
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Forecast {
@@ -169,4 +171,17 @@ model PushSubscription {
   p256dh   String
   auth     String
   user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model McpOAuthGrant {
+  codeDigest   String   @id
+  clientId     String
+  challenge    String
+  redirectUri  String
+  resource     String
+  accessDigest String?  @unique
+  expiresAt    DateTime
+  client       McpToken @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
 }
