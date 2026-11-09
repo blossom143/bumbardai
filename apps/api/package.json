@@ -1,0 +1,40 @@
+{
+  "name": "@hallway/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "start": "node --import tsx src/index.ts",
+    "build": "prisma generate",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/app.test.ts src/features/*/*.test.ts",
+    "migrate": "prisma migrate deploy",
+    "catalog:import": "node --env-file-if-exists=../../.env --import tsx src/features/explore/import-catalog.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/static": "^8.3.0",
+    "@hallway/shared": "workspace:*",
+    "@node-rs/argon2": "^2.0.2",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-node": "^0.208.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.208.0",
+    "@prisma/client": "6.19.0",
+    "@js-temporal/polyfill": "^0.5.1",
+    "fastify": "^5.6.2",
+    "ical.js": "^2.2.1",
+    "openai": "^6.9.0",
+    "cheerio": "1.1.2",
+    "tsx": "^4.20.6",
+    "web-push": "^3.6.7",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "@types/web-push": "^3.6.4",
+    "prisma": "6.19.0",
+    "typescript": "^5.9.3"
+  }
+}
