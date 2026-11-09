@@ -46,6 +46,10 @@ Save this as a local Caddyfile and run `caddy run --config /path/to/Caddyfile`.
 
 Set `PUBLIC_ORIGIN=https://192.168.1.12` in `.env`, recreate the app, and trust the local Caddy CA on the phone before visiting that URL. HTTPS enables the service worker and camera on a separate device. Installability and Web Push depend on the browser and platform. To enable basic browser push, generate a VAPID key pair with `pnpm --filter @hallway/api exec web-push generate-vapid-keys`, configure the three VAPID variables in `.env`, recreate the app and reminder worker, and opt in from Profile. In-app reminders work independently of push. Set an OTLP endpoint to export API and reminder spans.
 
+## Deploy to Kubernetes
+
+Use the [Flux deployment guide](deploy/README.md) for persistent storage, database migrations, the app, and optional Ollama and HTTPS configuration.
+
 ## Hackathon walkthrough
 
 1. Register with **Use the guided demo with sample data** checked. Enter a nickname, choose Kubernetes and Go, select a comfortable networking level, and finish onboarding. Replay uses Tuesday, November 10, 2026 at 10:45 a.m. Mountain Time, with simulated weather, sessions, and attendees.
