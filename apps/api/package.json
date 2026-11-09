@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
-    "start": "tsx src/index.ts",
+    "start": "node --import tsx src/index.ts",
     "build": "prisma generate",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/*.test.ts",
+    "test": "node --import tsx --test src/*.test.ts",
     "migrate": "prisma migrate deploy",
-    "catalog:import": "tsx --env-file-if-exists=../../.env src/import-catalog.ts"
+    "catalog:import": "node --env-file-if-exists=../../.env --import tsx src/import-catalog.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
