@@ -230,6 +230,31 @@ test('hybrid discovery, consent and mutual introduction use server-owned data', 
 });
 
 test(
+  'demo reminder preferences only generate reminders for the caller and are rate limited',
+  setup,
+  async () => {
+    const caller = await attendee();
+    const other = await attendee();
+    const prefs = { enabled: true, quietStart: '22:00', quietEnd: '07:00', zone: 'America/Denver' };
+    await addEvent(caller.cookie);
+    await addEvent(other.cookie);
+    await db.user.update({ where: { id: other.id }, data: { reminderPrefs: prefs } });
+
+    const save = () => request('/api/reminders/preferences', 'PUT', prefs, caller.cookie);
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const response = await save();
+      assert.equal(response.statusCode, 200, response.body);
+    }
+    assert.equal((await save()).statusCode, 429);
+    assert.equal(await db.reminder.count({ where: { userId: caller.id } }), 2);
+    assert.equal(await db.reminder.count({ where: { userId: other.id } }), 0);
+
+    await runReminderCycle();
+    assert.equal(await db.reminder.count({ where: { userId: other.id } }), 2);
+  },
+);
+
+test(
   'duplicate reminder cycles produce one reminder and completed checklists stay quiet',
   setup,
   async () => {
