@@ -1,0 +1,82 @@
+name: hallway-quest
+x-app: &app
+  image: hallway-quest:local
+  build: .
+  environment:
+    DATABASE_URL: postgresql://hallway:${POSTGRES_PASSWORD:-hallway_local}@postgres:5432/hallway
+    ELASTICSEARCH_URL: http://elasticsearch:9200
+    PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
+    TRUST_PROXY: ${TRUST_PROXY:-false}
+    OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+    OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+    OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+    VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+    VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: hallway
+      POSTGRES_DB: hallway
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hallway_local}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hallway -d hallway"]
+      interval: 4s
+      timeout: 3s
+      retries: 20
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.8
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - search-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=2s' > /dev/null"]
+      interval: 5s
+      timeout: 4s
+      retries: 24
+  migrate:
+    <<: *app
+    command: ["pnpm", "--filter", "@hallway/api", "migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+  app:
+    <<: *app
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 4s
+      retries: 8
+  reminders:
+    <<: *app
+    command: ["pnpm", "--filter", "@hallway/api", "exec", "tsx", "src/worker.ts"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  catalog:
+    <<: *app
+    command: ["pnpm", "--filter", "@hallway/api", "catalog:import"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pg-data:
+  search-data:
