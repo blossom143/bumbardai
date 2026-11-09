@@ -17,6 +17,8 @@ const defaults: ProfileInput = {
   difficulty: 'easy',
   discoverable: false,
   shareBackground: false,
+  linkedinUrl: '',
+  shareLinkedIn: false,
 };
 export function ProfileForm({
   user,
@@ -42,6 +44,7 @@ export function ProfileForm({
   const [login, setLogin] = useState('');
   const chosen = form.watch('interests');
   const discoverable = form.watch('discoverable');
+  const linkedinUrl = form.watch('linkedinUrl');
   const fieldError = Object.values(form.formState.errors)[0]?.message;
   const submit = form.handleSubmit((profile) => save.run(profile, { onSuccess: onUser }));
 
@@ -71,6 +74,16 @@ export function ProfileForm({
           <Input {...form.register('background')} placeholder="e.g. Platform engineer" />
         </label>
       </div>
+      <label>
+        LinkedIn profile URL <span className="muted">(optional)</span>
+        <Input
+          {...form.register('linkedinUrl')}
+          type="url"
+          inputMode="url"
+          placeholder="https://www.linkedin.com/in/you"
+          autoComplete="url"
+        />
+      </label>
       <div className="github-line">
         <label>
           GitHub username <span className="muted">(optional)</span>
@@ -164,16 +177,34 @@ export function ProfileForm({
         Let other attendees discover me
       </label>
       {discoverable && (
-        <label className="check-label">
-          <Controller
-            control={form.control}
-            name="shareBackground"
-            render={({ field }) => (
-              <Checkbox checked={field.value} onCheckedChange={field.onChange} ref={field.ref} />
-            )}
-          />{' '}
-          Show my professional background to attendees
-        </label>
+        <>
+          <label className="check-label">
+            <Controller
+              control={form.control}
+              name="shareBackground"
+              render={({ field }) => (
+                <Checkbox checked={field.value} onCheckedChange={field.onChange} ref={field.ref} />
+              )}
+            />{' '}
+            Show my professional background to attendees
+          </label>
+          {linkedinUrl.trim() && (
+            <label className="check-label">
+              <Controller
+                control={form.control}
+                name="shareLinkedIn"
+                render={({ field }) => (
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    ref={field.ref}
+                  />
+                )}
+              />{' '}
+              Show my LinkedIn profile to attendees
+            </label>
+          )}
+        </>
       )}
       {fieldError && (
         <p className="error" role="alert">

@@ -211,6 +211,32 @@ test('hybrid discovery, consent and mutual introduction use server-owned data', 
   const person = matches.json().people.find((item: { id: string }) => item.id === b.id);
   assert.ok(person, matches.body);
   assert.equal(person.background, undefined);
+  await request(
+    '/api/profile',
+    'PUT',
+    { ...b.profile, linkedinUrl: 'https://www.linkedin.com/in/test-person' },
+    b.cookie,
+  );
+  const privateLinkedIn = await request('/api/people', 'GET', undefined, a.cookie);
+  const privatePerson = privateLinkedIn
+    .json()
+    .people.find((item: { id: string }) => item.id === b.id);
+  assert.equal(privatePerson.linkedinUrl, undefined);
+  await request(
+    '/api/profile',
+    'PUT',
+    {
+      ...b.profile,
+      linkedinUrl: 'https://www.linkedin.com/in/test-person',
+      shareLinkedIn: true,
+    },
+    b.cookie,
+  );
+  const sharedLinkedIn = await request('/api/people', 'GET', undefined, a.cookie);
+  const sharedPerson = sharedLinkedIn
+    .json()
+    .people.find((item: { id: string }) => item.id === b.id);
+  assert.equal(sharedPerson.linkedinUrl, 'https://www.linkedin.com/in/test-person');
   const intro = await request('/api/people/' + b.id + '/intro', 'POST', {}, a.cookie);
   assert.equal(intro.json().status, 'pending', intro.body);
   assert.equal(
