@@ -119,7 +119,20 @@ export const adviceSchema = z.object({
   lead: z.string(),
   tips: z.string().array(),
 });
-export const assistantActionSchema = adviceSchema.shape.action;
+export const assistantActionSchema = adviceSchema.shape.action.extend({
+  savedActivity: z
+    .object({
+      id,
+      title: z.string(),
+      startsAt: timestamp.nullable(),
+      endsAt: timestamp.nullable(),
+      day: dateKey.nullable(),
+      zone: timeZone,
+      location: z.string(),
+      reason: z.string(),
+    })
+    .optional(),
+});
 export const assistantMessageSchema = z.object({
   id,
   role: z.enum(['user', 'assistant']),
