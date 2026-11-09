@@ -3,8 +3,8 @@ import { type User, Prisma } from '@prisma/client';
 import { profileInput } from '@hallway/shared';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { HttpError, requireUser } from './auth.js';
-import { db } from './db.js';
+import { HttpError, requireUser } from '../auth/auth.js';
+import { db } from '../../shared/db.js';
 import { attendeeSearch } from './search.js';
 
 const personas = [

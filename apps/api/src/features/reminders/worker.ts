@@ -5,7 +5,7 @@ const telemetry = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || process.env.OTEL_EX
   ? new NodeSDK({ serviceName: 'hallway-quest-reminders', traceExporter: new OTLPTraceExporter() }) : null;
 telemetry?.start();
 const { runReminderCycle } = await import('./reminders.js');
-const { db } = await import('./db.js');
+const { db } = await import('../../shared/db.js');
 let stopped = false;
 let timer: NodeJS.Timeout | undefined;
 let pending: Promise<void> | undefined;

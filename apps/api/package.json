@@ -8,9 +8,9 @@
     "start": "node --import tsx src/index.ts",
     "build": "prisma generate",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/*.test.ts",
+    "test": "node --import tsx --test src/app.test.ts src/features/*/*.test.ts",
     "migrate": "prisma migrate deploy",
-    "catalog:import": "node --env-file-if-exists=../../.env --import tsx src/import-catalog.ts"
+    "catalog:import": "node --env-file-if-exists=../../.env --import tsx src/features/explore/import-catalog.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

@@ -65,7 +65,7 @@ services:
       retries: 8
   reminders:
     <<: *app
-    command: ["pnpm", "--filter", "@hallway/api", "exec", "tsx", "src/worker.ts"]
+    command: ["pnpm", "--filter", "@hallway/api", "exec", "tsx", "src/features/reminders/worker.ts"]
     depends_on:
       migrate:
         condition: service_completed_successfully

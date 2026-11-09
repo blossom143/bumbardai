@@ -5,7 +5,7 @@ const telemetry = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || process.env.OTEL_EX
   ? new NodeSDK({ serviceName: 'hallway-quest-api', traceExporter: new OTLPTraceExporter() }) : null;
 telemetry?.start();
 const { createApp } = await import('./app.js');
-const { db } = await import('./db.js');
+const { db } = await import('./shared/db.js');
 const app = await createApp({ logger: true });
 await db.$connect();
 await app.listen({ host: '0.0.0.0', port: Number(process.env.PORT || 3000) });

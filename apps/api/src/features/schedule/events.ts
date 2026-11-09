@@ -2,10 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import type { Prisma } from '@prisma/client';
 import { dateKey, eventInput, profileInput, timeZone, type EventInput } from '@hallway/shared';
 import { z } from 'zod';
-import { HttpError, requireUser } from './auth.js';
+import { HttpError, requireUser } from '../auth/auth.js';
 import { atLocal, clock, dayAfter, localDay, overlaps, readIcs, writeIcs, zone } from './calendar.js';
-import { db } from './db.js';
-import { preparationCopy } from './assistant.js';
+import { db } from '../../shared/db.js';
+import { preparationCopy } from '../assistant/assistant.js';
 
 const checklistTemplates: Record<string, string[]> = {
   hackathon: ['Pack your laptop', 'Pack your charger', 'Check GitHub access', 'Set up development tools', 'Review registration details'],

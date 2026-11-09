@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
-import { traced } from './telemetry.js';
+import { traced } from '../../shared/telemetry.js';
 
 const prose = z.object({ lead: z.string().max(220), tips: z.array(z.string().max(170)).max(3) });
 const questCopy = z.object({ title: z.string().max(90), mission: z.string().max(300), icebreaker: z.string().max(190) });

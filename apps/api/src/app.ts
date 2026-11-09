@@ -6,13 +6,13 @@ import { trace, SpanStatusCode, type Span } from '@opentelemetry/api';
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { ZodError } from 'zod';
-import { authRoutes, HttpError } from './auth.js';
-import { eventRoutes } from './events.js';
-import { todayRoutes } from './today.js';
-import { peopleRoutes } from './people.js';
-import { mcpRoutes } from './mcp.js';
-import { reminderRoutes } from './reminders.js';
-import { questRoutes } from './quests.js';
+import { authRoutes, HttpError } from './features/auth/auth.js';
+import { eventRoutes } from './features/schedule/events.js';
+import { todayRoutes } from './features/today/today.js';
+import { peopleRoutes } from './features/explore/people.js';
+import { mcpRoutes } from './features/mcp/mcp.js';
+import { reminderRoutes } from './features/reminders/reminders.js';
+import { questRoutes } from './features/quests/quests.js';
 
 export async function createApp({ logger = false } = {}) {
   const app = Fastify({ logger, disableRequestLogging: true, bodyLimit: 1024 * 1024, trustProxy: process.env.TRUST_PROXY === 'true' });

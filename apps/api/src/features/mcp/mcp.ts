@@ -1,15 +1,15 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { mcpTools } from '@hallway/shared/mcp';
 import { z } from 'zod';
-import { digest, HttpError, requireUser, secret } from './auth.js';
-import { db } from './db.js';
-import { agenda, nextEvent } from './events.js';
-import { clock, localDay } from './calendar.js';
-import { catalogQuery, catalogSearch, nextSession } from './catalog.js';
-import { nextAction, today } from './today.js';
-import { venueFor, weather } from './weather.js';
-import { findPeople } from './people.js';
-import { activeQuests, completeQuest, generateQuest, icebreaker, progress } from './quests.js';
+import { digest, HttpError, requireUser, secret } from '../auth/auth.js';
+import { db } from '../../shared/db.js';
+import { agenda, nextEvent } from '../schedule/events.js';
+import { clock, localDay } from '../schedule/calendar.js';
+import { catalogQuery, catalogSearch, nextSession } from '../explore/catalog.js';
+import { nextAction, today } from '../today/today.js';
+import { venueFor, weather } from '../today/weather.js';
+import { findPeople } from '../explore/people.js';
+import { activeQuests, completeQuest, generateQuest, icebreaker, progress } from '../quests/quests.js';
 
 const tokenSelect = { id: true, label: true, canWrite: true, expiresAt: true } as const;
 async function credential(request: FastifyRequest) {

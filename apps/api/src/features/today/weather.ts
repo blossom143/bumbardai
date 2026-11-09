@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { db } from './db.js';
-import { localDay } from './calendar.js';
+import { db } from '../../shared/db.js';
+import { localDay } from '../schedule/calendar.js';
 
 const hourData = z.object({ hourly: z.object({
   time: z.array(z.number()), temperature_2m: z.array(z.number().nullable()), rain: z.array(z.number().nullable()),

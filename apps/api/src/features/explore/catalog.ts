@@ -1,8 +1,8 @@
 import { type CatalogItem, type User } from '@prisma/client';
 import { officialSchedule, profileInput } from '@hallway/shared';
 import { z } from 'zod';
-import { atLocal, clock, localDay, overlaps } from './calendar.js';
-import { db } from './db.js';
+import { atLocal, clock, localDay, overlaps } from '../schedule/calendar.js';
+import { db } from '../../shared/db.js';
 import { sessionSearch } from './search.js';
 
 export const catalogQuery = z.object({
@@ -69,7 +69,7 @@ export async function catalogSearch(user: User, input: CatalogQuery) {
     .map(({ item }) => ({ ...item, reason: reasonFor(item, interests, input.q) })) };
 }
 
-export async function nextSession(user: User, events: Awaited<ReturnType<typeof import('./events.js').agenda>>, until?: Date) {
+export async function nextSession(user: User, events: Awaited<ReturnType<typeof import('../schedule/events.js').agenda>>, until?: Date) {
   if (user.demo) await ensureDemoCatalog();
   const now = clock(user.demo);
   const day = localDay(now);

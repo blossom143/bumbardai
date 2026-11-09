@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, InjectOptions } from 'fastify';
 import { createApp } from './app.js';
-import { digest } from './auth.js';
-import { db } from './db.js';
-import { importCatalog } from './import-catalog.js';
-import { runReminderCycle } from './reminders.js';
-import { weather } from './weather.js';
+import { digest } from './features/auth/auth.js';
+import { db } from './shared/db.js';
+import { importCatalog } from './features/explore/import-catalog.js';
+import { runReminderCycle } from './features/reminders/reminders.js';
+import { weather } from './features/today/weather.js';
 
 let app: FastifyInstance;
 const userIds: string[] = [];

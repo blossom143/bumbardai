@@ -3,11 +3,11 @@ import { Prisma, type User } from '@prisma/client';
 import { profileInput } from '@hallway/shared';
 import { z } from 'zod';
 import { randomInt } from 'node:crypto';
-import { digest, HttpError, requireUser } from './auth.js';
-import { newIcebreaker, newQuestCopy } from './assistant.js';
-import { clock, freeUntil, localDay } from './calendar.js';
-import { agenda } from './events.js';
-import { db } from './db.js';
+import { digest, HttpError, requireUser } from '../auth/auth.js';
+import { newIcebreaker, newQuestCopy } from '../assistant/assistant.js';
+import { clock, freeUntil, localDay } from '../schedule/calendar.js';
+import { agenda } from '../schedule/events.js';
+import { db } from '../../shared/db.js';
 
 const rewards = { easy: 50, medium: 75, hard: 100 };
 const categories = [

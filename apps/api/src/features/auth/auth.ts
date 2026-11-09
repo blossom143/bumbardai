@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { credentials, profileInput } from '@hallway/shared';
 import { Prisma, type User } from '@prisma/client';
 import { z } from 'zod';
-import { db } from './db.js';
+import { db } from '../../shared/db.js';
 
 export class HttpError extends Error {
   constructor(public statusCode: number, message: string) { super(message); }

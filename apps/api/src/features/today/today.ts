@@ -2,15 +2,15 @@ import type { User } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import { profileInput } from '@hallway/shared';
 import { z } from 'zod';
-import { HttpError, requireUser } from './auth.js';
-import { briefingCopy, nextCopy } from './assistant.js';
-import { clock, dayAfter, freeUntil, localDay, overlaps } from './calendar.js';
-import { catalogQuery, catalogSearch, ensureDemoCatalog, nextSession, reasonFor } from './catalog.js';
-import { agenda, nextEvent } from './events.js';
-import { activeQuests, generateQuest, icebreaker, progress } from './quests.js';
+import { HttpError, requireUser } from '../auth/auth.js';
+import { briefingCopy, nextCopy } from '../assistant/assistant.js';
+import { clock, dayAfter, freeUntil, localDay, overlaps } from '../schedule/calendar.js';
+import { catalogQuery, catalogSearch, ensureDemoCatalog, nextSession, reasonFor } from '../explore/catalog.js';
+import { agenda, nextEvent } from '../schedule/events.js';
+import { activeQuests, generateQuest, icebreaker, progress } from '../quests/quests.js';
 import { venueFor, weather } from './weather.js';
-import { db } from './db.js';
-import { findPeople } from './people.js';
+import { db } from '../../shared/db.js';
+import { findPeople } from '../explore/people.js';
 
 export async function briefingContext(user: User) {
   const now = clock(user.demo);

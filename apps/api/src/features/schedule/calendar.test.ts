@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { atLocal, freeUntil, overlaps, readIcs, writeIcs } from './calendar.js';
-import { normalizeFeed } from './import-catalog.js';
-import { fuse } from './search.js';
+import { normalizeFeed } from '../explore/import-catalog.js';
+import { fuse } from '../explore/search.js';
 
 test('calendar preserves real instants across DST and rejects ambiguous wall-clock inputs', () => {
   assert.equal(atLocal('2026-03-08T01:30').toISOString(), '2026-03-08T08:30:00.000Z');

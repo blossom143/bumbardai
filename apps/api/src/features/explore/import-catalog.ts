@@ -3,8 +3,8 @@ import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { officialSchedule, hackathonSource } from '@hallway/shared';
-import { atLocal, localDay } from './calendar.js';
-import { db } from './db.js';
+import { atLocal, localDay } from '../schedule/calendar.js';
+import { db } from '../../shared/db.js';
 
 const topicPatterns = {
   Kubernetes: /\bkubernetes\b|\bk8s\b/i,

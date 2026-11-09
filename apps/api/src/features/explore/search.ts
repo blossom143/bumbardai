@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import OpenAI from 'openai';
-import { traced } from './telemetry.js';
+import { traced } from '../../shared/telemetry.js';
 
 const endpoint = process.env.ELASTICSEARCH_URL;
 const token = process.env.ELASTICSEARCH_API_KEY;

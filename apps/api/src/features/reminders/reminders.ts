@@ -3,10 +3,10 @@ import { z } from 'zod';
 import { Temporal } from '@js-temporal/polyfill';
 import { timeZone } from '@hallway/shared';
 import webPush from 'web-push';
-import { HttpError, requireUser } from './auth.js';
-import { db } from './db.js';
-import { traced } from './telemetry.js';
-import { replayTime } from './calendar.js';
+import { HttpError, requireUser } from '../auth/auth.js';
+import { db } from '../../shared/db.js';
+import { traced } from '../../shared/telemetry.js';
+import { replayTime } from '../schedule/calendar.js';
 
 const hhmm = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
 const settings = z.object({ enabled: z.boolean(), quietStart: hhmm, quietEnd: hhmm, zone: timeZone });
