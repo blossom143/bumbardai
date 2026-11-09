@@ -25,6 +25,20 @@ model User {
   subscriptions PushSubscription[]
   sent          Introduction[] @relation("sender")
   received      Introduction[] @relation("recipient")
+  assistantMessages AssistantMessage[]
+}
+
+model AssistantMessage {
+  id        String   @id @default(uuid())
+  userId    String
+  role      String
+  content   String
+  action    Json?
+  mode      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model LoginSession {

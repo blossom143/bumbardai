@@ -10,7 +10,9 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Compass, MessageCircle, QrCode, Sparkles, Timer, Trophy, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { QuestLeaderboard } from './quest-leaderboard';
 import { api, useAction, useResource, type Award, type Quest } from '../../shared/api';
+import { QuestProgressMap } from './quest-progress-map';
 import {
   Input,
   Card,
@@ -69,7 +71,7 @@ export function QuestCard({ quest, onAward }: { quest: Quest; onAward: (result: 
   const action = useAction<Award | { ok: true }, string>(
     (action) =>
       api('/quests/' + quest.id + '/action', awardSchema.or(okSchema), 'POST', { action }),
-    ['quests', 'today', 'progress'],
+    ['quests', 'today', 'progress', 'quest-leaderboard'],
   );
   const ice = useAction<{ icebreaker: string }, void>(
     () => api('/icebreaker', icebreakerSchema, 'POST', { questId: quest.id }),
@@ -196,7 +198,7 @@ export function Quests() {
   );
   const verify = useAction<{ verified: boolean }, string>(
     (code) => api('/quests/verify', z.object({ verified: z.literal(true) }), 'POST', { code }),
-    ['quests', 'today', 'progress'],
+    ['quests', 'today', 'progress', 'quest-leaderboard'],
   );
   const [award, setAward] = useState<Award>();
   const [verifying, setVerifying] = useState(false);
@@ -228,6 +230,7 @@ export function Quests() {
           </Button>
         }
       />
+      <QuestProgressMap quests={query.data ?? []} />
       {query.loading && <Loading />}
       <ErrorText error={query.error || create.error} />
       {available ? (
@@ -252,6 +255,7 @@ export function Quests() {
           </Card>
         )
       )}
+      <QuestLeaderboard />
       {history && history.length > 0 && (
         <section className="section-gap">
           <h2>Quest history</h2>

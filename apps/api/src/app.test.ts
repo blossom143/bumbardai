@@ -1,6 +1,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
+import { questLeaderboardSchema } from '@hallway/shared/responses';
 import type { FastifyInstance, InjectOptions } from 'fastify';
 import { createApp } from './app.js';
 import { digest } from './features/auth/auth.js';
@@ -8,6 +9,8 @@ import { db } from './shared/db.js';
 import { importCatalog } from './features/explore/import-catalog.js';
 import { runReminderCycle } from './features/reminders/reminders.js';
 import { weather } from './features/today/weather.js';
+import { scheduleIntentSchema } from '@hallway/shared/responses';
+import { z } from 'zod';
 
 let app: FastifyInstance;
 const userIds: string[] = [];
@@ -38,12 +41,12 @@ async function request(
     remoteAddress: '127.1.0.' + ip,
   });
 }
-async function attendee(discoverable = false) {
+async function attendee(discoverable = false, demo = true) {
   ip++;
   const created = await request('/api/auth/register', 'POST', {
     email: randomUUID() + '@example.test',
     password: 'safe-test-password',
-    demo: true,
+    demo,
   });
   assert.equal(created.statusCode, 201, created.body);
   const id = created.json().id as string;
@@ -124,6 +127,152 @@ test(
     );
     assert.equal((await request('/api/auth/logout', 'POST', undefined, a.cookie)).statusCode, 204);
     assert.equal((await request('/api/me', 'GET', undefined, a.cookie)).statusCode, 401);
+  },
+);
+
+test(
+  'assistant chat is private, clearable, and adds only conflict-free events',
+  setup,
+  async (t) => {
+    const a = await attendee();
+    const b = await attendee();
+    const first = await request(
+      '/api/assistant',
+      'POST',
+      { question: 'What is the weather?' },
+      a.cookie,
+    );
+    assert.equal(first.statusCode, 200, first.body);
+    const ownHistory = await request('/api/assistant/history', 'GET', undefined, a.cookie);
+    assert.equal(ownHistory.json().length, 2);
+    assert.deepEqual(
+      (await request('/api/assistant/history', 'GET', undefined, b.cookie)).json(),
+      [],
+    );
+    assert.equal(
+      (await request('/api/assistant/history', 'DELETE', undefined, b.cookie)).statusCode,
+      204,
+    );
+    assert.equal(
+      (await request('/api/assistant/history', 'GET', undefined, a.cookie)).json().length,
+      2,
+    );
+
+    const prior = {
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+      AI_PROVIDER: process.env.AI_PROVIDER,
+    };
+    process.env.OPENAI_API_KEY = 'fixture-key';
+    process.env.AI_PROVIDER = 'openai';
+    let interpretation: z.infer<typeof scheduleIntentSchema> = {
+      action: 'clarify',
+      message: 'What start and end time should I use?',
+      event: null,
+    };
+    const mock = t.mock.method(
+      globalThis,
+      'fetch',
+      async (_url: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        const output = body.tools
+          ? [
+              {
+                type: 'function_call',
+                id: 'fc_event',
+                name: 'get_attendee_context',
+                call_id: 'call_event',
+                arguments: '{}',
+                status: 'completed',
+              },
+            ]
+          : [
+              {
+                type: 'message',
+                id: 'msg_event',
+                role: 'assistant',
+                status: 'completed',
+                content: [
+                  { type: 'output_text', text: JSON.stringify(interpretation), annotations: [] },
+                ],
+              },
+            ];
+        return Response.json({ id: 'resp_event', status: 'completed', output });
+      },
+    );
+    try {
+      const clarify = await request(
+        '/api/assistant',
+        'POST',
+        { question: 'Add lunch tomorrow' },
+        a.cookie,
+      );
+      assert.match(clarify.json().messages[1].content, /start and end time/);
+      assert.equal((await request('/api/events', 'GET', undefined, a.cookie)).json().length, 0);
+
+      interpretation = {
+        action: 'create',
+        message: 'I found a time for lunch.',
+        event: {
+          title: 'Lunch with the team',
+          category: 'meeting',
+          location: '',
+          description: '',
+          day: '2026-11-10',
+          startTime: '13:00',
+          endTime: '14:00',
+        },
+      };
+      const created = await request(
+        '/api/assistant',
+        'POST',
+        { question: 'Tomorrow from 1 to 2' },
+        a.cookie,
+      );
+      assert.match(created.json().messages[1].content, /Added “Lunch with the team”/);
+      assert.equal((await request('/api/events', 'GET', undefined, a.cookie)).json().length, 1);
+
+      await addEvent(a.cookie, {
+        ...activity,
+        title: 'Existing appointment',
+        startsAt: '2026-11-10T21:00:00Z',
+        endsAt: '2026-11-10T22:00:00Z',
+      });
+      interpretation = {
+        action: 'create',
+        message: 'I found another time.',
+        event: {
+          title: 'Conflicting lunch',
+          category: 'meeting',
+          location: '',
+          description: '',
+          day: '2026-11-10',
+          startTime: '13:30',
+          endTime: '14:30',
+        },
+      };
+      const conflict = await request(
+        '/api/assistant',
+        'POST',
+        { question: 'Schedule a follow-up tomorrow afternoon' },
+        a.cookie,
+      );
+      assert.match(conflict.json().messages[1].content, /overlaps with .*Existing appointment/);
+      assert.equal((await request('/api/events', 'GET', undefined, a.cookie)).json().length, 2);
+      assert.equal(
+        (await request('/api/assistant/history', 'DELETE', undefined, a.cookie)).statusCode,
+        204,
+      );
+      assert.deepEqual(
+        (await request('/api/assistant/history', 'GET', undefined, a.cookie)).json(),
+        [],
+      );
+    } finally {
+      mock.mock.restore();
+      for (const [key, value] of Object.entries(prior)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   },
 );
 
@@ -211,6 +360,32 @@ test('hybrid discovery, consent and mutual introduction use server-owned data', 
   const person = matches.json().people.find((item: { id: string }) => item.id === b.id);
   assert.ok(person, matches.body);
   assert.equal(person.background, undefined);
+  await request(
+    '/api/profile',
+    'PUT',
+    { ...b.profile, linkedinUrl: 'https://www.linkedin.com/in/test-person' },
+    b.cookie,
+  );
+  const privateLinkedIn = await request('/api/people', 'GET', undefined, a.cookie);
+  const privatePerson = privateLinkedIn
+    .json()
+    .people.find((item: { id: string }) => item.id === b.id);
+  assert.equal(privatePerson.linkedinUrl, undefined);
+  await request(
+    '/api/profile',
+    'PUT',
+    {
+      ...b.profile,
+      linkedinUrl: 'https://www.linkedin.com/in/test-person',
+      shareLinkedIn: true,
+    },
+    b.cookie,
+  );
+  const sharedLinkedIn = await request('/api/people', 'GET', undefined, a.cookie);
+  const sharedPerson = sharedLinkedIn
+    .json()
+    .people.find((item: { id: string }) => item.id === b.id);
+  assert.equal(sharedPerson.linkedinUrl, 'https://www.linkedin.com/in/test-person');
   const intro = await request('/api/people/' + b.id + '/intro', 'POST', {}, a.cookie);
   assert.equal(intro.json().status, 'pending', intro.body);
   assert.equal(
@@ -474,3 +649,95 @@ test('Gemini OAuth binds consent and PKCE to a revocable credential', setup, asy
     401,
   );
 });
+test(
+  'quest leaderboard ranks earned XP within each audience and reads current consent',
+  setup,
+  async () => {
+    const endpoint = '/api/quests/leaderboard';
+    assert.equal((await request(endpoint)).statusCode, 401);
+
+    async function seedScore(userId: string, points: number) {
+      await db.quest.create({
+        data: {
+          userId,
+          title: 'Leaderboard fixture',
+          mission: 'Say hello',
+          icebreaker: 'What are you learning?',
+          category: 'Icebreaker',
+          difficulty: 'easy',
+          minutes: 5,
+          status: 'completed',
+          mode: 'rules',
+          award: { create: { userId, points } },
+        },
+      });
+    }
+
+    async function read(cookie: string) {
+      const response = await request(endpoint, 'GET', undefined, cookie);
+      assert.equal(response.statusCode, 200, response.body);
+      return questLeaderboardSchema.parse(response.json());
+    }
+
+    async function consent(person: Awaited<ReturnType<typeof attendee>>, enabled: boolean) {
+      const response = await request(
+        '/api/profile',
+        'PUT',
+        { ...person.profile, showOnQuestLeaderboard: enabled },
+        person.cookie,
+      );
+      assert.equal(response.statusCode, 200, response.body);
+    }
+
+    const viewer = await attendee();
+    await seedScore(viewer.id, 50);
+    assert.deepEqual(await read(viewer.cookie), { leaders: [], viewer: null });
+    await consent(viewer, true);
+    assert.deepEqual((await read(viewer.cookie)).leaders, [
+      { rank: 1, nickname: viewer.profile.nickname, xp: 50, isViewer: true },
+    ]);
+
+    const first = await attendee();
+    await consent(first, true);
+    await seedScore(first.id, 50);
+    await seedScore(first.id, 50);
+    const second = await attendee();
+    await consent(second, true);
+    await seedScore(second.id, 100);
+
+    for (let index = 0; index < 8; index++) {
+      const person = await attendee();
+      await consent(person, true);
+      await seedScore(person.id, 75);
+    }
+
+    const hidden = await attendee(true);
+    await seedScore(hidden.id, 100);
+    const zeroXp = await attendee();
+    await consent(zeroXp, true);
+    const live = await attendee(false, false);
+    await consent(live, true);
+    await seedScore(live.id, 100);
+
+    const board = await read(viewer.cookie);
+    assert.deepEqual(
+      board.leaders.map(({ rank, xp }) => [rank, xp]),
+      [[1, 100], [1, 100], ...Array.from({ length: 8 }, () => [3, 75])],
+    );
+    assert.equal(
+      board.leaders.some(({ isViewer }) => isViewer),
+      false,
+    );
+    assert.deepEqual(board.viewer, { rank: 11, nickname: viewer.profile.nickname, xp: 50 });
+    assert.deepEqual((await read(live.cookie)).leaders, [
+      { rank: 1, nickname: live.profile.nickname, xp: 100, isViewer: true },
+    ]);
+
+    await consent(first, false);
+    const updated = await read(viewer.cookie);
+    assert.ok(!updated.leaders.some(({ nickname }) => nickname === first.profile.nickname));
+    assert.equal(updated.viewer?.rank, 10);
+    await consent(viewer, false);
+    assert.equal((await read(viewer.cookie)).viewer, null);
+  },
+);
