@@ -1,8 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { devices, expect, test } from '@playwright/test';
 
-test('phone onboarding to XP, offline schedule, and the same account on desktop', async ({ browser, baseURL }) => {
-  const phone = await browser.newContext({ ...devices['iPhone 13'], defaultBrowserType: 'chromium', baseURL });
+test('phone onboarding to XP, offline schedule, and the same account on desktop', async ({
+  browser,
+  baseURL,
+}) => {
+  const phone = await browser.newContext({
+    ...devices['iPhone 13'],
+    defaultBrowserType: 'chromium',
+    baseURL,
+  });
   const page = await phone.newPage();
   const email = 'browser-' + randomUUID() + '@example.test';
   const password = 'hallway-browser-test';
@@ -16,11 +23,15 @@ test('phone onboarding to XP, offline schedule, and the same account on desktop'
     await page.getByLabel('Professional background').fill('Platform engineer');
     await page.getByRole('button', { name: 'Kubernetes', exact: true }).click();
     await page.getByRole('button', { name: 'Go', exact: true }).click();
-    await page.getByLabel('Conference goals').fill('Learn Kubernetes and practice one introduction.');
+    await page
+      .getByLabel('Conference goals')
+      .fill('Learn Kubernetes and practice one introduction.');
     await page.getByRole('button', { name: 'Go to Today' }).click();
     await expect(page.getByRole('heading', { name: 'Hello, Avery.' })).toBeVisible();
     await expect(page.getByText('Pack a warm layer.')).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      390,
+    );
     const mobile = page.getByRole('navigation', { name: 'Primary mobile' });
     await mobile.getByRole('link', { name: 'Schedule' }).click();
     await page.getByRole('button', { name: 'Add activity' }).click();
@@ -49,10 +60,15 @@ test('phone onboarding to XP, offline schedule, and the same account on desktop'
     await reward.getByRole('button', { name: 'Keep exploring' }).click();
     await mobile.getByRole('link', { name: 'Explore' }).click();
     await page.getByPlaceholder('Try “beginner-friendly Kubernetes talks”').fill('beginner Go');
-    await expect(page.getByRole('heading', { name: 'Go tools for cloud native beginners' })).toBeVisible();
-    if (process.env.EXPECT_HYBRID === '1') await expect(page.getByText('Hybrid semantic search · Demo')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Go tools for cloud native beginners' }),
+    ).toBeVisible();
+    if (process.env.EXPECT_HYBRID === '1')
+      await expect(page.getByText('Hybrid semantic search · Demo')).toBeVisible();
 
-    await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+    });
     await phone.setOffline(true);
     await page.reload();
     await expect(page.getByText('Offline mode')).toBeVisible();
@@ -69,13 +85,20 @@ test('phone onboarding to XP, offline schedule, and the same account on desktop'
       await tab.getByRole('button', { name: 'Sign in', exact: true }).click();
       await expect(tab.getByRole('heading', { name: 'Hello, Avery.' })).toBeVisible();
       await expect(tab.getByText('50 XP', { exact: true })).toBeVisible();
-      await tab.getByRole('navigation', { name: 'Primary', exact: true }).getByRole('link', { name: 'Profile' }).click();
+      await tab
+        .getByRole('navigation', { name: 'Primary', exact: true })
+        .getByRole('link', { name: 'Profile' })
+        .click();
       await expect(tab.getByText('First Hello', { exact: true })).toBeVisible();
       await tab.getByRole('button', { name: 'Use dark mode' }).click();
       await expect(tab.locator('html')).toHaveAttribute('data-theme', 'dark');
       await tab.getByRole('button', { name: 'Sign out' }).click();
       await expect(tab.getByRole('heading', { name: 'Create your account' })).toBeVisible();
       expect(await tab.evaluate(() => localStorage.getItem('hallway-offline'))).toBeNull();
-    } finally { await desktop.close(); }
-  } finally { await phone.close(); }
+    } finally {
+      await desktop.close();
+    }
+  } finally {
+    await phone.close();
+  }
 });
