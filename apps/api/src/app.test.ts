@@ -1,6 +1,6 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { questLeaderboardSchema } from '@hallway/shared/responses';
 import type { FastifyInstance, InjectOptions } from 'fastify';
 import { createApp } from './app.js';
@@ -506,6 +506,58 @@ test(
       'quest',
     );
     assert.equal((await call('complete_quest', { questId })).statusCode, 403);
+    const eventDraft = {
+      title: 'Gemini-created event',
+      category: 'meeting',
+      location: '',
+      description: '',
+      zone: 'America/Denver',
+      startsAt: '2026-11-10T20:00:00Z',
+      endsAt: '2026-11-10T21:00:00Z',
+      day: null,
+    };
+    assert.equal((await call('create_schedule_event', { event: eventDraft })).statusCode, 403);
+    const scheduleToken = (
+      await request(
+        '/api/mcp/credentials',
+        'POST',
+        { label: 'Schedule client', canSchedule: true },
+        a.cookie,
+      )
+    ).json().token;
+    assert.equal(
+      (
+        await request('/api/mcp/tools/complete_quest', 'POST', { questId }, undefined, {
+          authorization: 'Bearer ' + scheduleToken,
+        })
+      ).statusCode,
+      403,
+    );
+    const scheduled = await request(
+      '/api/mcp/tools/create_schedule_event',
+      'POST',
+      { event: eventDraft },
+      undefined,
+      { authorization: 'Bearer ' + scheduleToken },
+    );
+    assert.equal(scheduled.statusCode, 200, scheduled.body);
+    assert.equal(scheduled.json().event.title, 'Gemini-created event');
+    const overlap = await request(
+      '/api/mcp/tools/create_schedule_event',
+      'POST',
+      {
+        event: {
+          ...eventDraft,
+          title: 'Overlapping event',
+          startsAt: '2026-11-10T20:30:00Z',
+          endsAt: '2026-11-10T21:30:00Z',
+        },
+      },
+      undefined,
+      { authorization: 'Bearer ' + scheduleToken },
+    );
+    assert.equal(overlap.json().conflicts.length, 1);
+    assert.equal((await request('/api/events', 'GET', undefined, a.cookie)).json().length, 2);
     const writeToken = (
       await request(
         '/api/mcp/credentials',
@@ -542,6 +594,61 @@ test(
   },
 );
 
+test('Gemini OAuth binds consent and PKCE to a revocable credential', setup, async (t) => {
+  const previous = process.env.PUBLIC_ORIGIN;
+  const origin = 'https://hallway.example.test';
+  process.env.PUBLIC_ORIGIN = origin;
+  t.after(() => {
+    if (previous === undefined) delete process.env.PUBLIC_ORIGIN;
+    else process.env.PUBLIC_ORIGIN = previous;
+  });
+  const owner = await attendee();
+  const other = await attendee();
+  const client = (
+    await request('/api/mcp/credentials', 'POST', { label: 'Gemini' }, owner.cookie)
+  ).json();
+  const verifier = 'A'.repeat(43);
+  const redirect = 'https://oauth-redirect.googleusercontent.com/r/hallway-test';
+  const query = new URLSearchParams({
+    response_type: 'code',
+    client_id: client.id,
+    redirect_uri: redirect,
+    state: 'test-state',
+    code_challenge: createHash('sha256').update(verifier).digest('base64url'),
+    code_challenge_method: 'S256',
+    resource: origin + '/mcp',
+  });
+  const authorize = '/api/mcp/oauth/authorize?' + query;
+  assert.equal((await request(authorize, 'GET', undefined, other.cookie)).statusCode, 403);
+  const consent = await request(authorize, 'POST', undefined, owner.cookie, { origin });
+  assert.equal(consent.statusCode, 303, consent.body);
+  const location = new URL(consent.headers.location!);
+  assert.equal(location.searchParams.get('state'), 'test-state');
+  const exchange = (proof: string) =>
+    request('/api/mcp/oauth/token', 'POST', {
+      grant_type: 'authorization_code',
+      client_id: client.id,
+      client_secret: client.token,
+      code: location.searchParams.get('code'),
+      redirect_uri: redirect,
+      code_verifier: proof,
+      resource: origin + '/mcp',
+    });
+  assert.equal((await exchange('B'.repeat(43))).json().error, 'invalid_grant');
+  const access = await exchange(verifier);
+  assert.equal(access.statusCode, 200, access.body);
+  assert.equal((await exchange(verifier)).json().error, 'invalid_grant');
+  const auth = { authorization: 'Bearer ' + access.json().access_token };
+  assert.equal(
+    (await request('/api/mcp/tools/get_my_progress', 'POST', {}, undefined, auth)).statusCode,
+    200,
+  );
+  await request('/api/mcp/credentials/' + client.id, 'DELETE', undefined, owner.cookie);
+  assert.equal(
+    (await request('/api/mcp/tools/get_my_progress', 'POST', {}, undefined, auth)).statusCode,
+    401,
+  );
+});
 test(
   'quest leaderboard ranks earned XP within each audience and reads current consent',
   setup,

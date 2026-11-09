@@ -179,6 +179,7 @@ export const credentialSchema = z.object({
   label: z.string(),
   expiresAt: timestamp,
   canWrite: z.boolean(),
+  canSchedule: z.boolean(),
 });
 export const calendarPreviewSchema = z.object({
   skipped: count,
