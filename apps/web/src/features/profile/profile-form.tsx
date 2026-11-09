@@ -2,7 +2,7 @@ import { interests, profileInput, type ProfileInput } from '@hallway/shared';
 import { attendeeSchema, githubProfileSchema } from '@hallway/shared/responses';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowRight, Github } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { api, useAction, type User } from '../../shared/api';
 import { Button, Checkbox, ErrorText, Input, NativeSelect, Textarea } from '../../shared/ui';
@@ -15,6 +15,7 @@ const defaults: ProfileInput = {
   firstTime: true,
   comfort: 'warming-up',
   difficulty: 'easy',
+  showOnQuestLeaderboard: false,
   discoverable: false,
   shareBackground: false,
 };
@@ -27,13 +28,14 @@ export function ProfileForm({
   onUser: (user: User) => void;
   onboarding?: boolean;
 }) {
+  const leaderboardDescriptionId = useId();
   const form = useForm<ProfileInput>({
     defaultValues: user.profile ?? defaults,
     resolver: zodResolver(profileInput),
   });
   const save = useAction(
     (profile: ProfileInput) => api('/profile', attendeeSchema, 'PUT', profile),
-    ['today', 'catalog', 'people'],
+    ['today', 'catalog', 'people', 'quest-leaderboard'],
   );
   const github = useAction((username: string) => {
     return api('/github/' + encodeURIComponent(username), githubProfileSchema);
@@ -153,6 +155,26 @@ export function ProfileForm({
         />{' '}
         This is my first time at this conference
       </label>
+      <div>
+        <label className="check-label">
+          <Controller
+            control={form.control}
+            name="showOnQuestLeaderboard"
+            render={({ field }) => (
+              <Checkbox
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                ref={field.ref}
+                aria-describedby={leaderboardDescriptionId}
+              />
+            )}
+          />
+          Show me on the quest leaderboard
+        </label>
+        <small id={leaderboardDescriptionId} className="block pl-6 muted">
+          Share your nickname and total quest XP with signed-in attendees.
+        </small>
+      </div>
       <label className="check-label">
         <Controller
           control={form.control}

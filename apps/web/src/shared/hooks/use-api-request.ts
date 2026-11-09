@@ -9,6 +9,7 @@ type Resource =
   | 'people'
   | 'events'
   | 'quests'
+  | 'quest-leaderboard'
   | 'progress'
   | 'reminders'
   | 'credentials';
