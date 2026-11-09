@@ -9,6 +9,11 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter @hallway/api test",
-    "dev": "pnpm --parallel --filter @hallway/api --filter @hallway/web dev"
+    "dev": "pnpm --parallel --filter @hallway/api --filter @hallway/web dev",
+    "format": "prettier --write \"{apps,packages}/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"{apps,packages}/**/*.{ts,tsx,css}\""
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
   }
 }

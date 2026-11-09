@@ -72,6 +72,7 @@ Alternatively set the client working directory to `apps/mcp` and use `node --imp
 pnpm install --frozen-lockfile
 pnpm build
 pnpm typecheck
+pnpm format:check
 pnpm test
 pnpm --filter @hallway/web exec playwright install chromium
 EXPECT_HYBRID=1 pnpm --filter @hallway/web test
@@ -80,4 +81,4 @@ pnpm --filter @hallway/mcp exec node --import tsx src/smoke.ts
 
 Browser and MCP smoke tests require a running test instance. Use `HALLWAY_APP_URL` or `HALLWAY_API_URL` for a non-default address. Run database integration tests against a **disposable** migrated PostgreSQL database by setting `TEST_DATABASE=1`, `DATABASE_URL`, and optionally `ELASTICSEARCH_URL`. Leave `OPENAI_API_KEY` empty for repeatable fixture tests. To develop against independently running services, set these URLs in the environment and run `pnpm dev`. Vite proxies `/api` to port 3000.
 
-The workspace contains a React/Vite frontend, a Fastify/Prisma API and reminder worker, a local MCP server, and shared Zod contracts. PostgreSQL owns schedules, consent, and awards. Elasticsearch indexes sessions and opted-in attendees for retrieval.
+The React/Vite frontend and Fastify API organize domain code under `src/features`. The web app uses shadcn/ui for controls, ahooks `useRequest` for HTTP state, and shared Zod schemas to validate API responses and infer TypeScript types. Run `pnpm format` to apply the workspace style. PostgreSQL owns schedules, consent, and awards. Elasticsearch indexes sessions and opted-in attendees for retrieval.

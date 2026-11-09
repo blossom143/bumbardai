@@ -1,4 +1,29 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --color-background: var(--surface);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-primary: var(--accent);
+  --color-primary-foreground: white;
+  --color-secondary: var(--lavender);
+  --color-secondary-foreground: var(--accent-ink);
+  --color-accent: var(--lavender);
+  --color-accent-foreground: var(--accent-ink);
+  --color-muted-foreground: var(--muted);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--accent);
+  --color-destructive: #ba392d;
+}
+
+[data-slot='native-select-wrapper'] {
+  width: 100%;
+}
 
 :root {
   font-family:
@@ -7,7 +32,7 @@
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
-    "Segoe UI",
+    'Segoe UI',
     sans-serif;
   color: #211b2e;
   background: #f8f7f4;
@@ -24,7 +49,7 @@
   --mint: #dff4e9;
   --shadow: 0 2px 3px #20103b05;
 }
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
   color-scheme: dark;
   --bg: #17131e;
   --surface: #211a2b;
@@ -215,8 +240,7 @@ h3 {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  padding: 0 max(16px, env(safe-area-inset-right)) 0
-    max(16px, env(safe-area-inset-left));
+  padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
@@ -286,8 +310,8 @@ h3 {
   bottom: 0;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  padding: 5px max(6px, env(safe-area-inset-right))
-    max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  padding: 5px max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom))
+    max(6px, env(safe-area-inset-left));
   border-top: 1px solid var(--line);
   background: var(--surface);
 }
@@ -548,10 +572,10 @@ h3 {
 .quest-feature .peach {
   background: var(--surface);
 }
-[data-theme="dark"] .mint {
+[data-theme='dark'] .mint {
   color: #a0ddc8;
 }
-[data-theme="dark"] .peach {
+[data-theme='dark'] .peach {
   color: #ffc498;
 }
 .text-link {
@@ -684,7 +708,7 @@ h3 {
   font-weight: 720;
   min-width: 0;
 }
-input:not([type="checkbox"]),
+input:not([type='checkbox']),
 textarea,
 select {
   width: 100%;
@@ -706,7 +730,7 @@ textarea::placeholder {
   color: var(--muted);
   opacity: 0.8;
 }
-input[type="checkbox"] {
+input[type='checkbox'] {
   width: 18px;
   height: 18px;
   accent-color: #603bc5;
@@ -826,7 +850,7 @@ button.chip {
   padding: 9px 0;
   font-size: 0.84rem;
 }
-.overlay {
+[data-slot='sheet-overlay'] {
   position: fixed;
   inset: 0;
   z-index: 20;
