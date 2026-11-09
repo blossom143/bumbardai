@@ -51,6 +51,9 @@ test('phone onboarding to XP, offline schedule, and the same account on desktop'
     await expect(assistant.getByRole('heading', { name: 'Make the first hello' })).toBeVisible();
     await assistant.getByRole('link', { name: 'Open quest' }).click();
     await page.getByRole('button', { name: 'Start quest' }).click();
+    const map = page.getByRole('list', { name: 'Completed quests and upcoming milestones' });
+    await expect(map.getByText('First quest', { exact: true })).toBeVisible();
+    await expect(map.getByText('CURRENT QUEST')).toBeVisible();
     await page.getByRole('button', { name: 'New icebreaker' }).click();
     await expect(page.getByText(/What are you excited to learn/)).toBeVisible();
     await page.getByRole('button', { name: 'Complete quest' }).click();
@@ -58,6 +61,8 @@ test('phone onboarding to XP, offline schedule, and the same account on desktop'
     await expect(reward.getByText('+50 XP', { exact: true })).toBeVisible();
     await expect(reward.getByText('First Hello')).toBeVisible();
     await reward.getByRole('button', { name: 'Keep exploring' }).click();
+    await expect(map.getByText('Checkpoint 1 · complete')).toBeVisible();
+    await expect(map.getByText('Community Builder', { exact: true })).toBeVisible();
     await mobile.getByRole('link', { name: 'Explore' }).click();
     await page.getByPlaceholder('Try “beginner-friendly Kubernetes talks”').fill('beginner Go');
     await expect(

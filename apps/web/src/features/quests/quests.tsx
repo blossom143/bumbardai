@@ -12,6 +12,7 @@ import { Camera, Compass, MessageCircle, QrCode, Sparkles, Timer, Trophy, Zap } 
 import { Link } from 'react-router-dom';
 import { QuestLeaderboard } from './quest-leaderboard';
 import { api, useAction, useResource, type Award, type Quest } from '../../shared/api';
+import { QuestProgressMap } from './quest-progress-map';
 import {
   Input,
   Card,
@@ -229,6 +230,7 @@ export function Quests() {
           </Button>
         }
       />
+      <QuestProgressMap quests={query.data ?? []} />
       {query.loading && <Loading />}
       <ErrorText error={query.error || create.error} />
       {available ? (
