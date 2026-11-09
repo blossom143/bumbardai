@@ -255,8 +255,16 @@ test(
         { question: 'Schedule a follow-up tomorrow afternoon' },
         a.cookie,
       );
-      assert.match(conflict.json().messages[1].content, /overlaps with Existing appointment/);
+      assert.match(conflict.json().messages[1].content, /overlaps with .*Existing appointment/);
       assert.equal((await request('/api/events', 'GET', undefined, a.cookie)).json().length, 2);
+      assert.equal(
+        (await request('/api/assistant/history', 'DELETE', undefined, a.cookie)).statusCode,
+        204,
+      );
+      assert.deepEqual(
+        (await request('/api/assistant/history', 'GET', undefined, a.cookie)).json(),
+        [],
+      );
     } finally {
       mock.mock.restore();
       for (const [key, value] of Object.entries(prior)) {
