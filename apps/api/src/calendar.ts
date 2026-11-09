@@ -32,11 +32,17 @@ export function freeUntil(now: Date, events: Interval[], cap?: Date) {
     ? event.startsAt : end, limit);
 }
 
-function parseTime(time: ICAL.Time, fallbackZone: string) {
+function iana(value: unknown): string | undefined {
+  if (typeof value !== 'string') return;
+  try { return new Intl.DateTimeFormat('en', { timeZone: value }).resolvedOptions().timeZone; }
+  catch { return undefined; }
+}
+
+function parseTime(time: ICAL.Time, fallbackZone: string, tzid?: string) {
   const id = time.zone.tzid;
   if (id === 'UTC' || id === 'Z') return time.toJSDate().toISOString();
-  const result = Intl.supportedValuesOf('timeZone').includes(id) ? id : undefined;
-  if (result || id === 'floating' || id === 'local') return atLocal(time.toString(), result ?? fallbackZone).toISOString();
+  const known = iana(tzid) ?? iana(id);
+  if (known || id === 'floating' || id === 'local') return atLocal(time.toString(), known ?? fallbackZone).toISOString();
   return time.toJSDate().toISOString();
 }
 
@@ -62,12 +68,16 @@ export function readIcs(input: string, fallbackZone: string, from: string, until
       if (component.getFirstPropertyValue('status') === 'CANCELLED') continue;
       const append = (item: ICAL.Event, start: ICAL.Time, end: ICAL.Time, instance: string) => {
         const sourceKey = 'ics:' + createHash('sha256').update(event.uid + ':' + instance).digest('hex');
-        const startZone = Intl.supportedValuesOf('timeZone').includes(start.zone.tzid) ? start.zone.tzid : fallbackZone;
+        const tzid = (property: string) => {
+          const value = item.component.getFirstProperty(property)?.getParameter('tzid');
+          return typeof value === 'string' ? value : undefined;
+        };
+        const startZone = iana(tzid('dtstart')) ?? iana(start.zone.tzid) ?? fallbackZone;
         entries.push({ sourceKey, event: eventInput.parse({
           title: item.summary || 'Imported event', category: 'personal', location: item.location || '',
           description: item.description || '', zone: startZone,
-          startsAt: start.isDate ? null : parseTime(start, fallbackZone),
-          endsAt: start.isDate ? null : parseTime(end, fallbackZone),
+          startsAt: start.isDate ? null : parseTime(start, fallbackZone, tzid('dtstart')),
+          endsAt: start.isDate ? null : parseTime(end, fallbackZone, tzid('dtend') ?? tzid('dtstart')),
           day: start.isDate ? start.toString() : null,
           endDay: start.isDate && end.compare(start) > 0 ? end.toString() : null,
         }) });

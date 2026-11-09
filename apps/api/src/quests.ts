@@ -71,7 +71,8 @@ async function finish(tx: Prisma.TransactionClient, userId: string, id: string) 
   if (quest.status === 'completed') return { awarded: 0, badges: [] };
   if (quest.status !== 'active') throw new HttpError(409, 'Start this quest before completing it.');
   const points = rewards[quest.difficulty as keyof typeof rewards] ?? 50;
-  await tx.quest.update({ where: { id }, data: { status: 'completed' } });
+  const changed = await tx.quest.updateMany({ where: { id, userId, status: 'active' }, data: { status: 'completed' } });
+  if (!changed.count) throw new HttpError(409, 'This quest is no longer active.');
   await tx.xpAward.create({ data: { questId: id, userId, points } });
   const count = await tx.quest.count({ where: { userId, status: 'completed' } });
   const possible = [
