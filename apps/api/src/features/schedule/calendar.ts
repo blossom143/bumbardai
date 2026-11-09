@@ -73,11 +73,8 @@ function parseTime(time: ICAL.Time, fallbackZone: string, tzid?: string) {
 }
 
 export function readIcs(input: string, fallbackZone: string, from: string, until: string) {
+  // ical.js resolves embedded VTIMEZONEs from the current calendar's component tree.
   const root = new ICAL.Component(ICAL.parse(input));
-  for (const component of root.getAllSubcomponents('vtimezone')) {
-    const timezone = new ICAL.Timezone({ component });
-    ICAL.TimezoneService.register(timezone);
-  }
   const entries: { sourceKey: string; event: EventInput }[] = [];
   let skipped = 0;
   const components = root.getAllSubcomponents('vevent');
