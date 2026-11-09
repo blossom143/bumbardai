@@ -11,7 +11,8 @@ type Resource =
   | 'quests'
   | 'progress'
   | 'reminders'
-  | 'credentials';
+  | 'credentials'
+  | 'assistant-history';
 
 const useRevisions = create<Partial<Record<Resource, number>>>(() => ({}));
 

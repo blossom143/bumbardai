@@ -8,6 +8,8 @@ import { db } from './shared/db.js';
 import { importCatalog } from './features/explore/import-catalog.js';
 import { runReminderCycle } from './features/reminders/reminders.js';
 import { weather } from './features/today/weather.js';
+import { scheduleIntentSchema } from '@hallway/shared/responses';
+import { z } from 'zod';
 
 let app: FastifyInstance;
 const userIds: string[] = [];
@@ -124,6 +126,144 @@ test(
     );
     assert.equal((await request('/api/auth/logout', 'POST', undefined, a.cookie)).statusCode, 204);
     assert.equal((await request('/api/me', 'GET', undefined, a.cookie)).statusCode, 401);
+  },
+);
+
+test(
+  'assistant chat is private, clearable, and adds only conflict-free events',
+  setup,
+  async (t) => {
+    const a = await attendee();
+    const b = await attendee();
+    const first = await request(
+      '/api/assistant',
+      'POST',
+      { question: 'What is the weather?' },
+      a.cookie,
+    );
+    assert.equal(first.statusCode, 200, first.body);
+    const ownHistory = await request('/api/assistant/history', 'GET', undefined, a.cookie);
+    assert.equal(ownHistory.json().length, 2);
+    assert.deepEqual(
+      (await request('/api/assistant/history', 'GET', undefined, b.cookie)).json(),
+      [],
+    );
+    assert.equal(
+      (await request('/api/assistant/history', 'DELETE', undefined, b.cookie)).statusCode,
+      204,
+    );
+    assert.equal(
+      (await request('/api/assistant/history', 'GET', undefined, a.cookie)).json().length,
+      2,
+    );
+
+    const prior = {
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+      AI_PROVIDER: process.env.AI_PROVIDER,
+    };
+    process.env.OPENAI_API_KEY = 'fixture-key';
+    process.env.AI_PROVIDER = 'openai';
+    let interpretation: z.infer<typeof scheduleIntentSchema> = {
+      action: 'clarify',
+      message: 'What start and end time should I use?',
+      event: null,
+    };
+    const mock = t.mock.method(
+      globalThis,
+      'fetch',
+      async (_url: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        const output = body.tools
+          ? [
+              {
+                type: 'function_call',
+                id: 'fc_event',
+                name: 'get_attendee_context',
+                call_id: 'call_event',
+                arguments: '{}',
+                status: 'completed',
+              },
+            ]
+          : [
+              {
+                type: 'message',
+                id: 'msg_event',
+                role: 'assistant',
+                status: 'completed',
+                content: [
+                  { type: 'output_text', text: JSON.stringify(interpretation), annotations: [] },
+                ],
+              },
+            ];
+        return Response.json({ id: 'resp_event', status: 'completed', output });
+      },
+    );
+    try {
+      const clarify = await request(
+        '/api/assistant',
+        'POST',
+        { question: 'Add lunch tomorrow' },
+        a.cookie,
+      );
+      assert.match(clarify.json().messages[1].content, /start and end time/);
+      assert.equal((await request('/api/events', 'GET', undefined, a.cookie)).json().length, 0);
+
+      interpretation = {
+        action: 'create',
+        message: 'I found a time for lunch.',
+        event: {
+          title: 'Lunch with the team',
+          category: 'meeting',
+          location: '',
+          description: '',
+          day: '2026-11-10',
+          startTime: '13:00',
+          endTime: '14:00',
+        },
+      };
+      const created = await request(
+        '/api/assistant',
+        'POST',
+        { question: 'Tomorrow from 1 to 2' },
+        a.cookie,
+      );
+      assert.match(created.json().messages[1].content, /Added “Lunch with the team”/);
+      assert.equal((await request('/api/events', 'GET', undefined, a.cookie)).json().length, 1);
+
+      await addEvent(a.cookie, {
+        ...activity,
+        title: 'Existing appointment',
+        startsAt: '2026-11-10T21:00:00Z',
+        endsAt: '2026-11-10T22:00:00Z',
+      });
+      interpretation = {
+        action: 'create',
+        message: 'I found another time.',
+        event: {
+          title: 'Conflicting lunch',
+          category: 'meeting',
+          location: '',
+          description: '',
+          day: '2026-11-10',
+          startTime: '13:30',
+          endTime: '14:30',
+        },
+      };
+      const conflict = await request(
+        '/api/assistant',
+        'POST',
+        { question: 'Schedule a follow-up tomorrow afternoon' },
+        a.cookie,
+      );
+      assert.match(conflict.json().messages[1].content, /overlaps with Existing appointment/);
+      assert.equal((await request('/api/events', 'GET', undefined, a.cookie)).json().length, 2);
+    } finally {
+      mock.mock.restore();
+      for (const [key, value] of Object.entries(prior)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   },
 );
 
