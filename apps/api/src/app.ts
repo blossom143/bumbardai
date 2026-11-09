@@ -11,6 +11,7 @@ import { eventRoutes } from './events.js';
 import { todayRoutes } from './today.js';
 import { peopleRoutes } from './people.js';
 import { mcpRoutes } from './mcp.js';
+import { reminderRoutes } from './reminders.js';
 import { questRoutes } from './quests.js';
 
 export async function createApp({ logger = false } = {}) {
@@ -59,9 +60,12 @@ export async function createApp({ logger = false } = {}) {
   questRoutes(app);
   peopleRoutes(app);
   mcpRoutes(app);
+  reminderRoutes(app);
   const webRoot = resolve(process.env.WEB_ROOT || '../web/dist');
   if (existsSync(webRoot + '/index.html')) {
-    await app.register(staticFiles, { root: webRoot, wildcard: false });
+    await app.register(staticFiles, { root: webRoot, wildcard: false, setHeaders(response, file) {
+      if (file.endsWith('/sw.js') || file.endsWith('/index.html')) response.setHeader('Cache-Control', 'no-cache');
+    } });
     app.setNotFoundHandler((request, reply) => {
       if (!request.url.startsWith('/api/') && request.method === 'GET' && request.headers.accept?.includes('text/html')) {
         return reply.sendFile('index.html', { maxAge: 0 });
