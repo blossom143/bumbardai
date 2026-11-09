@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hallway-storage-ingress
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [hallway-postgres, hallway-elasticsearch]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              hallway-quest.io/storage-client: 'true'
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 9200

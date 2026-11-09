@@ -20,6 +20,17 @@ docker compose logs migrate catalog
 
 Set `OPENAI_API_KEY` in `.env` and recreate the app to enable model-written briefings, quests, icebreakers, and live catalog embeddings. The app labels rules-based guidance and keyword-only search when the providers are unavailable. The guided demo uses topic fixtures for vector search when the key is absent. A fresh live catalog search can take longer while the index is populated.
 
+### Use local Ollama
+
+Start Ollama and use `ollama list` to find a downloaded chat model. For example, with `gemma4:e4b` installed, set these values in `.env`:
+
+```dotenv
+AI_PROVIDER=ollama
+OLLAMA_MODEL=gemma4:e4b
+```
+
+Recreate the app with `docker compose up --build -d app`. Docker Desktop defaults to `http://host.docker.internal:11434` and native development defaults to `http://127.0.0.1:11434`. Set `OLLAMA_BASE_URL` if your API process needs a different address. The assistant uses rules-based guidance if the model is unavailable or its reply fails validation. Search embeddings are configured separately through OpenAI.
+
 Refresh the official schedule with `docker compose run --rm catalog`. The importer checks the Salt Lake City edition and preserves the last successful catalog on fetch or validation failure. The official Cloud Native Hackathon is a date-only entry. Set your confirmed start and end in Schedule to get timed reminders. [Conference schedule](https://events.linuxfoundation.org/kubecon-cloudnativecon-north-america/program/schedule/) · [Hackathon organizer](https://www.wemakedevs.org/hackathons/cnh)
 
 Run `docker compose down` to stop the stack and retain its data. To test on a phone, put the phone and laptop on the same network and reverse-proxy the loopback app over HTTPS. For example, on the Docker host with Caddy installed, replace `192.168.1.12` with its LAN address:
@@ -34,6 +45,10 @@ https://192.168.1.12 {
 Save this as a local Caddyfile and run `caddy run --config /path/to/Caddyfile`.
 
 Set `PUBLIC_ORIGIN=https://192.168.1.12` in `.env`, recreate the app, and trust the local Caddy CA on the phone before visiting that URL. HTTPS enables the service worker and camera on a separate device. Installability and Web Push depend on the browser and platform. To enable basic browser push, generate a VAPID key pair with `pnpm --filter @hallway/api exec web-push generate-vapid-keys`, configure the three VAPID variables in `.env`, recreate the app and reminder worker, and opt in from Profile. In-app reminders work independently of push. Set an OTLP endpoint to export API and reminder spans.
+
+## Deploy to Kubernetes
+
+Use the [Flux deployment guide](deploy/README.md) for persistent storage, database migrations, the app, and optional Ollama and HTTPS configuration.
 
 ## Hackathon walkthrough
 

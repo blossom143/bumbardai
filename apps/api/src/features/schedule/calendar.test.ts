@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import ICAL from 'ical.js';
 import { atLocal, freeUntil, overlaps, readIcs, writeIcs } from './calendar.js';
 import { normalizeFeed } from '../explore/import-catalog.js';
 import { fuse } from '../explore/search.js';
@@ -66,6 +67,46 @@ test('ICS accepts standard IANA TZID without requiring embedded VTIMEZONE', () =
   const result = readIcs(source, 'America/Denver', '2026-11-01', '2026-12-01');
   assert.equal(result.entries[0]?.event.startsAt, '2026-11-10T16:00:00.000Z');
 });
+
+test('ICS resolves custom zones only within the calendar that defines them', () => {
+  const tzid = 'X-HALLWAY-CUSTOM';
+  const source = (offset?: string) =>
+    [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      ...(offset
+        ? [
+            'BEGIN:VTIMEZONE',
+            `TZID:${tzid}`,
+            'BEGIN:STANDARD',
+            'DTSTART:19700101T000000',
+            `TZOFFSETFROM:${offset}`,
+            `TZOFFSETTO:${offset}`,
+            'END:STANDARD',
+            'END:VTIMEZONE',
+          ]
+        : []),
+      'BEGIN:VEVENT',
+      'UID:custom-zone',
+      'SUMMARY:Local talk',
+      `DTSTART;TZID=${tzid}:20261110T110000`,
+      `DTEND;TZID=${tzid}:20261110T120000`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+  const importCalendar = (offset?: string) =>
+    readIcs(source(offset), 'America/Denver', '2026-11-01', '2026-12-01');
+
+  const first = importCalendar('+0230');
+  assert.equal(first.skipped, 0);
+  assert.equal(first.entries[0]?.event.startsAt, '2026-11-10T08:30:00.000Z');
+  assert.equal(first.entries[0]?.event.endsAt, '2026-11-10T09:30:00.000Z');
+  assert.equal(importCalendar('-0400').entries[0]?.event.startsAt, '2026-11-10T15:00:00.000Z');
+  assert.equal(importCalendar().entries[0]?.event.startsAt, '2026-11-10T18:00:00.000Z');
+  assert.equal(ICAL.TimezoneService.has(tzid), false);
+});
+
 test('incomplete schedule feed is rejected and rank fusion favors agreement', () => {
   assert.throws(() => normalizeFeed({ speakers: [], rooms: [], categories: [], sessions: [] }));
   assert.deepEqual(fuse(['keyword', 'shared'], ['semantic', 'shared']), [

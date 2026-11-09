@@ -1,0 +1,65 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: hallway-storage
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  prune: true
+  wait: true
+  path: ./deploy/kubernetes/storage
+  sourceRef:
+    kind: GitRepository
+    name: hallway-quest
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: hallway-migrate
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 5m
+  prune: true
+  wait: true
+  dependsOn:
+    - name: hallway-storage
+  path: ./deploy/kubernetes/migrate
+  sourceRef:
+    kind: GitRepository
+    name: hallway-quest
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: hallway-app
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 5m
+  prune: true
+  wait: true
+  dependsOn:
+    - name: hallway-migrate
+  path: ./deploy/kubernetes/app-cloudflare
+  sourceRef:
+    kind: GitRepository
+    name: hallway-quest
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: hallway-catalog
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 5m
+  prune: true
+  wait: true
+  dependsOn:
+    - name: hallway-migrate
+  path: ./deploy/kubernetes/catalog
+  sourceRef:
+    kind: GitRepository
+    name: hallway-quest

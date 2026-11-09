@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hallway-reminders
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hallway-reminders
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hallway-reminders
+        hallway-quest.io/storage-client: 'true'
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: reminders
+          image: hallway-quest
+          command:
+            - pnpm
+            - --filter
+            - '@hallway/api'
+            - exec
+            - node
+            - --import
+            - tsx
+            - src/features/reminders/worker.ts
+          envFrom:
+            - configMapRef:
+                name: hallway-config
+            - secretRef:
+                name: hallway-quest-optional
+                optional: true
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: hallway-quest-db
+                  key: DATABASE_URL
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi

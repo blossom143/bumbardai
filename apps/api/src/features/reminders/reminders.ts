@@ -76,10 +76,13 @@ async function push(userId: string) {
   );
 }
 
-export async function runReminderCycle(realNow = new Date()) {
+export async function runReminderCycle({
+  userId,
+  realNow = new Date(),
+}: { userId?: string; realNow?: Date } = {}) {
   return traced('reminder.schedule', async () => {
     const users = await db.user.findMany({
-      where: { reminderPrefs: { path: ['enabled'], equals: true } },
+      where: { id: userId, reminderPrefs: { path: ['enabled'], equals: true } },
       select: { id: true, demo: true, reminderPrefs: true },
     });
     for (const user of users) {
@@ -140,13 +143,17 @@ export function reminderRoutes(app: FastifyInstance) {
       select: { id: true, message: true, createdAt: true },
     }),
   );
-  app.put('/api/reminders/preferences', async (request) => {
-    const user = await requireUser(request);
-    const prefs = settings.parse(request.body);
-    await db.user.update({ where: { id: user.id }, data: { reminderPrefs: prefs } });
-    if (prefs.enabled && user.demo) await runReminderCycle();
-    return prefs;
-  });
+  app.put(
+    '/api/reminders/preferences',
+    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (request) => {
+      const user = await requireUser(request);
+      const prefs = settings.parse(request.body);
+      await db.user.update({ where: { id: user.id }, data: { reminderPrefs: prefs } });
+      if (prefs.enabled && user.demo) await runReminderCycle({ userId: user.id });
+      return prefs;
+    },
+  );
   app.delete('/api/reminders/:id', async (request, reply) => {
     const user = await requireUser(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
