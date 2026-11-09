@@ -129,6 +129,7 @@ export const peopleSchema = z.object({
       id,
       nickname: z.string(),
       background: z.string().optional(),
+      linkedinUrl: z.string().url().optional(),
       shared: z.string().array(),
       reason: z.string(),
       icebreaker: z.string(),
