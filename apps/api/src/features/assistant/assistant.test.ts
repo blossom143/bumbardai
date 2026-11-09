@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { briefingCopy, preparationCopy } from './assistant.js';
+import { briefingCopy, nextCopy, preparationCopy } from './assistant.js';
 
 test('the OpenAI adapter supplies strict tool and output schemas, and passes authoritative context', async (t) => {
   const prior = process.env.OPENAI_API_KEY;
+  const previousProvider = process.env.AI_PROVIDER;
+  process.env.AI_PROVIDER = 'openai';
   process.env.OPENAI_API_KEY = 'fixture-key';
   const sent: Record<string, unknown>[] = [];
   const fake = t.mock.method(
@@ -72,5 +74,48 @@ test('the OpenAI adapter supplies strict tool and output schemas, and passes aut
     fake.mock.restore();
     if (prior === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = prior;
+    if (previousProvider === undefined) delete process.env.AI_PROVIDER;
+    else process.env.AI_PROVIDER = previousProvider;
   }
+});
+
+test('Ollama receives the field-guide schema and invalid replies fall back', async (t) => {
+  const environment = {
+    AI_PROVIDER: 'ollama',
+    OLLAMA_BASE_URL: 'http://127.0.0.1:11434',
+    OLLAMA_MODEL: 'local-test-model',
+  };
+  const previous = Object.keys(environment).map((key) => [key, process.env[key]] as const);
+  Object.assign(process.env, environment);
+  t.after(() => {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  const guidance = { lead: 'Try a short quest.', tips: ['Start with one question.'] };
+  const mockFetch = t.mock.method(
+    globalThis,
+    'fetch',
+    async (_url: RequestInfo | URL, _options?: RequestInit) =>
+      Response.json({ done: true, message: { content: JSON.stringify(guidance) } }),
+  );
+
+  const context = { kind: 'quest', minutes: 15 };
+  const question = 'What should I do next?';
+  assert.deepEqual(await nextCopy(context, question), guidance);
+
+  const [url, options] = mockFetch.mock.calls[0]!.arguments;
+  assert.equal(String(url), 'http://127.0.0.1:11434/api/chat');
+  assert.equal(new Headers(options?.headers).has('Authorization'), false);
+  const payload = JSON.parse(String(options?.body));
+  assert.equal(payload.model, environment.OLLAMA_MODEL);
+  assert.deepEqual(payload.format.required, ['lead', 'tips']);
+  assert.deepEqual(JSON.parse(payload.messages[1].content), { question, context });
+
+  mockFetch.mock.mockImplementation(async () =>
+    Response.json({ done: true, message: { content: '{"lead":"No tips field"}' } }),
+  );
+  assert.equal(await nextCopy(context, question), null);
 });
