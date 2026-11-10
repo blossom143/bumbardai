@@ -118,26 +118,11 @@ jobs:
               --metadata-file /tmp/ci-artifacts/build-metadata.json \
               --push .
 
-            # Buildx writes JSON metadata. Fall back to the registry if metadata is unavailable.
-            if ! DIGEST=$(python3 - /tmp/ci-artifacts/build-metadata.json <<'PYTHON'
-            import json
-            import re
-            import sys
-
-            with open(sys.argv[1]) as metadata:
-                digest = json.load(metadata).get("containerimage.digest", "")
-            if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
-                sys.exit("Build metadata does not contain a valid image digest.")
-            print(digest)
-            PYTHON
-            ); then
-              echo "Reading the published digest from the registry..."
-              DIGEST=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "${IMAGE}:${TAG}")
-            fi
-
-            if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-              echo "Could not determine a valid published image digest." >&2
-              exit 1
+            # Extract the immutable image digest from build metadata
+            DIGEST=$(jq -r '."containerimage.digest"' /tmp/ci-artifacts/build-metadata.json)
+            if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+              echo "Fallback: retrieving digest using buildx imagetools..."
+              DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" 2>&1 | grep "^Digest:" | awk '{print $2}')
             fi
 
             echo "Published image digest: ${DIGEST}"
